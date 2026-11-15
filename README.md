@@ -85,3 +85,7 @@ npx wrangler secret put MCP_SERVER_SECRET --env dev   # the same value as the AP
 npx wrangler secret put SANDBOX_ACCOUNT_KEY --env dev # a test key of the sandbox account
 npm run deploy:dev
 ```
+
+## License
+
+[MIT](LICENSE)
