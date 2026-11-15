@@ -1,6 +1,7 @@
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import { parseProps } from "../auth/props";
+import { sha256Hex } from "../crypto";
 import { backendFor } from "../backend";
 import type { AppEnv } from "../env";
 import { buildServer } from "./server";
@@ -33,9 +34,12 @@ export const mcpApiHandler = {
       return Response.json({ error: "invalid_token" }, { status: 401 });
     }
     const auth: unknown = Reflect.get(ctx, "auth");
+    const owner =
+      props.sandboxId ?? `token:${await sha256Hex(props.apiToken ?? "")}`;
     const session: Session = {
       props,
       env,
+      owner,
       backend: backendFor(props, env),
       revoke: () => revokeConnection(env, auth),
     };

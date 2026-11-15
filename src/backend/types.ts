@@ -49,7 +49,7 @@ export interface PhotoOptions {
 }
 
 /** The backend of one connection: the Modelfy API, or the sandbox. */
-export interface PhotoBackend extends PhotoInput {
+export interface PhotoBackend extends PhotoInput, PhotoSessions {
   account(): Promise<Account>;
   models(): Promise<Model[]>;
   backgrounds(): Promise<Background[]>;
@@ -88,4 +88,91 @@ export interface PhotoInput {
   addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]>;
   createUploadSession(files: FileToUpload[]): Promise<UploadSession>;
   readUploadSession(sessionId: string): Promise<UploadSessionState>;
+}
+
+export const SHOT_TYPES = [
+  "close-up",
+  "medium-shot",
+  "full-body",
+  "wide-shot",
+  "detail",
+  "flat-lay",
+  "still-life",
+  "hanger",
+  "ghost-mannequin",
+] as const;
+
+export interface PlanInput {
+  products: Array<{
+    upload_ids: string[];
+    name?: string | undefined;
+    description?: string | undefined;
+  }>;
+  mode: "place" | "studio";
+  background_color?: string | undefined;
+  model_ids?: string[] | undefined;
+  background_id?: string | undefined;
+  place_description?: string | undefined;
+  aspect_ratio: string;
+  photos_per_product: number;
+  shot_types?: Array<(typeof SHOT_TYPES)[number]> | undefined;
+  outfit?:
+    { style?: string | undefined; note?: string | undefined } | undefined;
+  direction?: string | undefined;
+  resolution?: string | undefined;
+  quality?: string | undefined;
+  locale: string;
+}
+
+/** What a quote keeps: everything needed to launch exactly the previewed session. */
+export interface StoredPlan {
+  launchBody: Record<string, unknown>;
+  credits: number;
+  photos: number;
+}
+
+export interface Plan {
+  stored: StoredPlan;
+  withModel: number;
+  withoutModel: number;
+  enoughCredits: boolean;
+  mood: string | null;
+  promptRewritten: boolean;
+}
+
+export type SessionState =
+  "running" | "completed" | "partial" | "failed" | "cancelled";
+
+export interface SessionPhoto {
+  photo_id: string;
+  url: string;
+  product: string | null;
+}
+
+export interface SessionStatus {
+  session_id: string;
+  name: string;
+  status: SessionState;
+  total: number;
+  done: number;
+  failed: number;
+  credits: { reserved: number; charged: number; refunded: number };
+  photos: SessionPhoto[];
+  web_url: string;
+}
+
+export interface RecentPhoto {
+  photo_id: string;
+  url: string;
+  created_at: string;
+  session_id: string | null;
+  session_name: string | null;
+}
+
+export interface PhotoSessions {
+  plan(input: PlanInput): Promise<Plan>;
+  launch(plan: StoredPlan, idempotencyKey: string): Promise<SessionStatus>;
+  session(sessionId: string): Promise<SessionStatus>;
+  cancel(sessionId: string): Promise<SessionStatus>;
+  recent(limit: number, sessionId: string | null): Promise<RecentPhoto[]>;
 }

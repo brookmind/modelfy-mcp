@@ -8,6 +8,8 @@ import { errorResult, toAgentError } from "./errors";
 export interface Session {
   props: GrantProps;
   env: AppEnv;
+  /** Who owns quotes and budgets: sha256 of the Modelfy token, or the sandbox id */
+  owner: string;
   backend: PhotoBackend;
   /** Ends an OAuth connection whose Modelfy token stopped working. */
   revoke(): Promise<void>;

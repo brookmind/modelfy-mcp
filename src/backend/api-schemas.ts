@@ -89,3 +89,58 @@ export const UploadSessionStateSchema = z.object({
   pending: z.number(),
   rejected: z.array(z.object({ uploadId: z.string(), reason: z.string() })),
 });
+
+export const PreviewSchema = z.object({
+  seed: z.number(),
+  creativePrompt: z.string(),
+  moodPhrase: z.string().nullable(),
+  moderation: z.object({ verdict: z.string() }).nullable(),
+  direction: z.record(z.string(), z.unknown()).nullable(),
+  summary: z.object({
+    products: z.number(),
+    shots: z.number(),
+    withModel: z.number(),
+    withoutModel: z.number(),
+  }),
+  credits: z.number(),
+  balanceOk: z.boolean(),
+});
+
+export const ShootDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(["RUNNING", "COMPLETED", "PARTIAL", "FAILED", "CANCELLED"]),
+  counts: z.object({
+    queued: z.number(),
+    running: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    cancelled: z.number(),
+  }),
+  credits: z.object({
+    reserved: z.number(),
+    charged: z.number(),
+    refunded: z.number(),
+  }),
+  items: z.array(z.object({ id: z.string(), name: z.string().nullable() })),
+  shots: z.array(
+    z.object({
+      itemId: z.string(),
+      status: z.string(),
+      media: z.object({ id: z.string(), url: z.string() }).nullable(),
+    }),
+  ),
+});
+
+export const LibrarySchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string(),
+      url: z.string(),
+      createdAt: z.string(),
+      shoot: z.object({ id: z.string(), name: z.string() }).optional(),
+    }),
+  ),
+});
+
+export const OkSchema = z.object({ ok: z.literal(true) });

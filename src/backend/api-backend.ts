@@ -6,13 +6,19 @@ import {
   CastListSchema,
   ConfirmedUploadSchema,
   CreatedUploadSchema,
+  LibrarySchema,
   MeSchema,
+  OkSchema,
+  PreviewSchema,
+  ShootDetailSchema,
   SetListSchema,
   ShootOptionsSchema,
   UploadSessionSchema,
   UploadSessionStateSchema,
 } from "./api-schemas";
 import { safeImageFetch } from "./download";
+import { previewBody } from "./plan-body";
+import { toSessionStatus } from "./session-status";
 import type {
   Account,
   AddedPhoto,
@@ -21,6 +27,11 @@ import type {
   Model,
   PhotoBackend,
   PhotoOptions,
+  Plan,
+  PlanInput,
+  RecentPhoto,
+  SessionStatus,
+  StoredPlan,
   UploadSession,
   UploadSessionState,
 } from "./types";
@@ -31,10 +42,12 @@ const READY_CAST = new Set(["READY", "PARTIAL"]);
 export class ApiBackend implements PhotoBackend {
   readonly #api: ModelfyApi;
   readonly #props: GrantProps;
+  readonly #webUrl: string;
 
   constructor(env: Env, props: GrantProps, apiToken: string) {
     this.#api = new ModelfyApi(env, apiToken);
     this.#props = props;
+    this.#webUrl = env.WEB_URL;
   }
 
   async account(): Promise<Account> {
@@ -177,5 +190,83 @@ export class ApiBackend implements PhotoBackend {
         reason: file.reason,
       })),
     };
+  }
+
+  async plan(input: PlanInput): Promise<Plan> {
+    const body = previewBody(input);
+    const preview = await this.#api.post(
+      "/v2/shoots/preview",
+      body,
+      PreviewSchema,
+    );
+    const launchBody: Record<string, unknown> = {
+      ...body,
+      seed: preview.seed,
+      creativePrompt: preview.creativePrompt,
+      ...(preview.moodPhrase !== null
+        ? { moodPhrase: preview.moodPhrase }
+        : {}),
+      ...(preview.direction !== null ? { direction: preview.direction } : {}),
+    };
+    return {
+      stored: {
+        launchBody,
+        credits: preview.credits,
+        photos: preview.summary.shots,
+      },
+      withModel: preview.summary.withModel,
+      withoutModel: preview.summary.withoutModel,
+      enoughCredits: preview.balanceOk,
+      mood: preview.moodPhrase,
+      promptRewritten: preview.moderation !== null,
+    };
+  }
+
+  async launch(
+    plan: StoredPlan,
+    idempotencyKey: string,
+  ): Promise<SessionStatus> {
+    const detail = await this.#api.post(
+      "/v2/shoots",
+      { ...plan.launchBody, idempotencyKey },
+      ShootDetailSchema,
+    );
+    return toSessionStatus(detail, this.#webUrl);
+  }
+
+  async session(sessionId: string): Promise<SessionStatus> {
+    const detail = await this.#api.get(
+      `/v2/shoots/${encodeURIComponent(sessionId)}`,
+      ShootDetailSchema,
+    );
+    return toSessionStatus(detail, this.#webUrl);
+  }
+
+  async cancel(sessionId: string): Promise<SessionStatus> {
+    await this.#api.post(
+      `/v2/shoots/${encodeURIComponent(sessionId)}/cancel`,
+      undefined,
+      OkSchema,
+    );
+    return this.session(sessionId);
+  }
+
+  async recent(
+    limit: number,
+    sessionId: string | null,
+  ): Promise<RecentPhoto[]> {
+    const query = new URLSearchParams({ type: "image", limit: String(limit) });
+    if (sessionId !== null) query.set("shootId", sessionId);
+    const library = await this.#api.get(
+      `/v2/library?${query.toString()}`,
+      LibrarySchema,
+    );
+    return library.items.map((item) => ({
+      photo_id: item.id,
+      url: item.url,
+      created_at: item.createdAt,
+      session_id: item.shoot?.id ?? null,
+      session_name: item.shoot?.name ?? null,
+    }));
   }
 }
