@@ -1,0 +1,36 @@
+{
+  "name": "modelfy-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modelfy MCP server: let any AI agent create product photos with Modelfy",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:dev": "wrangler deploy --env dev",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.4",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "agents": "^0.33.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.8.2",
+    "@eslint/js": "^9.39.5",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@vitest/runner": "~4.1.0",
+    "@vitest/snapshot": "~4.1.0",
+    "eslint": "^9.39.5",
+    "prettier": "^3.10.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.162.0"
+  }
+}

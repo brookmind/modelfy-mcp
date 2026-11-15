@@ -1,0 +1,91 @@
+import { env } from "cloudflare:workers";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import { ApiFailure, ModelfyApi } from "../../src/api/client";
+
+const Thing = z.object({ id: z.string(), credits: z.number() });
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+describe("ModelfyApi", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("adds the bearer token and the secret", async () => {
+    const seen: Request[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      seen.push(new Request(input, init));
+      return Promise.resolve(json(200, { data: { id: "t1", credits: 5 } }));
+    });
+
+    await new ModelfyApi(env, "mfy_live_x").get("/v2/thing", Thing);
+
+    expect(seen[0]?.url).toBe("https://api.test/v2/thing");
+    expect(seen[0]?.headers.get("Authorization")).toBe("Bearer mfy_live_x");
+    expect(seen[0]?.headers.get("X-Mcp-Secret")).toBe("test-secret");
+  });
+
+  it("sends no Authorization header without a token", async () => {
+    const seen: Request[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      seen.push(new Request(input, init));
+      return Promise.resolve(json(200, { data: { id: "t1", credits: 5 } }));
+    });
+
+    await new ModelfyApi(env, null).post("/v2/thing", { a: 1 }, Thing);
+
+    expect(seen[0]?.headers.get("Authorization")).toBeNull();
+    expect(await seen[0]?.json()).toEqual({ a: 1 });
+  });
+
+  it("unwraps data and parses it", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      json(200, { data: { id: "t1", credits: 5, extra: true } }),
+    );
+
+    const thing = await new ModelfyApi(env, "k").get("/v2/thing", Thing);
+
+    expect(thing).toEqual({ id: "t1", credits: 5 });
+  });
+
+  it("a non-2xx answer becomes ApiFailure with the API code", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      json(402, { error: "INSUFFICIENT_CREDITS", message: "Not enough" }),
+    );
+
+    const failure = await new ModelfyApi(env, "k")
+      .get("/v2/thing", Thing)
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ApiFailure);
+    expect(failure).toMatchObject({
+      status: 402,
+      code: "INSUFFICIENT_CREDITS",
+      message: "Not enough",
+    });
+  });
+
+  it("an unexpected shape becomes ApiFailure BAD_RESPONSE", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      json(200, { data: { id: 3 } }),
+    );
+
+    await expect(
+      new ModelfyApi(env, "k").get("/v2/thing", Thing),
+    ).rejects.toMatchObject({ status: 502, code: "BAD_RESPONSE" });
+  });
+
+  it("a network failure becomes ApiFailure UNAVAILABLE", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("down"));
+
+    await expect(
+      new ModelfyApi(env, "k").get("/v2/thing", Thing),
+    ).rejects.toMatchObject({ status: 503, code: "UNAVAILABLE" });
+  });
+});
