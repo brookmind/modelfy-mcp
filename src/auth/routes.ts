@@ -4,6 +4,7 @@ import {
 } from "@cloudflare/workers-oauth-provider";
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
+import { randomBase64Url } from "../crypto";
 import type { AppEnv } from "../env";
 import type { GrantProps } from "./props";
 
@@ -31,16 +32,6 @@ const RedeemedSchema = z.object({ userId: z.string(), token: z.string() });
 
 function authRequestKey(state: string): string {
   return `auth-request:${state}`;
-}
-
-function randomState(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
 }
 
 function page(status: number, title: string, body: string): Response {
@@ -102,7 +93,7 @@ export async function authorize(
     0,
     MAX_CLIENT_NAME,
   );
-  const state = randomState();
+  const state = randomBase64Url(32);
   const stored: StoredAuthRequest = { request: authRequest, clientName };
   await env.OAUTH_KV.put(authRequestKey(state), JSON.stringify(stored), {
     expirationTtl: AUTH_REQUEST_TTL_SECONDS,
@@ -167,7 +158,6 @@ export async function callback(
     kind: "oauth",
     userId: redeemed.userId,
     apiToken: redeemed.token,
-    tokenId: null,
     sandboxId: null,
     budget: null,
   };

@@ -17,8 +17,6 @@ export const GrantPropsSchema = z.object({
   kind: TokenKindSchema,
   userId: z.string().nullable(),
   apiToken: z.string().nullable(),
-  /** The token's id on the API side (quotes are bound to it); null for anonymous keys */
-  tokenId: z.string().nullable(),
   sandboxId: z.string().nullable(),
   budget: BudgetSchema.nullable(),
 });
