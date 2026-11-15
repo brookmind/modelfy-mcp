@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "modelfy": { "type": "http", "url": "https://mcp.modelfy.ai/mcp" }
+  }
+}

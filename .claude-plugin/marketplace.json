@@ -1,0 +1,14 @@
+{
+  "name": "modelfy",
+  "description": "Modelfy for Claude Code: product photos from your agent",
+  "owner": { "name": "Brookmind", "url": "https://modelfy.ai" },
+  "plugins": [
+    {
+      "name": "modelfy",
+      "source": "./plugin",
+      "description": "Create product photos with Modelfy: the MCP server plus a skill for the whole workflow",
+      "category": "productivity",
+      "tags": ["mcp", "images", "e-commerce", "product-photos"]
+    }
+  ]
+}

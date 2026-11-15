@@ -1,0 +1,11 @@
+{
+  "name": "modelfy",
+  "displayName": "Modelfy",
+  "version": "0.1.0",
+  "description": "Create product photos with Modelfy: the MCP server plus a skill that teaches the workflow, the questions to ask and when to ask before spending credits",
+  "author": { "name": "Brookmind", "url": "https://modelfy.ai" },
+  "homepage": "https://mcp.modelfy.ai/docs",
+  "repository": "https://github.com/brookmind/modelfy-mcp",
+  "license": "MIT",
+  "keywords": ["mcp", "product-photos", "e-commerce", "images"]
+}
