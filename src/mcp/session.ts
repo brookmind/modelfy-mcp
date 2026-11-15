@@ -3,6 +3,7 @@ import type { GrantProps } from "../auth/props";
 import type { PhotoBackend } from "../backend/types";
 import type { AppEnv } from "../env";
 import { errorResult, toAgentError } from "./errors";
+import type { LayerText } from "./layer";
 
 /** One authenticated MCP request: who it is, its backend, and how to end it. */
 export interface Session {
@@ -11,6 +12,8 @@ export interface Session {
   /** Who owns quotes and budgets: sha256 of the Modelfy token, or the sandbox id */
   owner: string;
   backend: PhotoBackend;
+  /** The agent-facing text this connection gets (v0, or bare for evals) */
+  layer: LayerText;
   /** Ends an OAuth connection whose Modelfy token stopped working. */
   revoke(): Promise<void>;
 }
@@ -39,6 +42,10 @@ export async function guarded(
   } catch (error) {
     const agentError = toAgentError(error);
     if (agentError.code === "CONNECTION_REVOKED") await session.revoke();
-    return errorResult(agentError, session.env.PUBLIC_URL);
+    return errorResult(
+      agentError,
+      session.env.PUBLIC_URL,
+      session.layer.errorGuidance,
+    );
   }
 }

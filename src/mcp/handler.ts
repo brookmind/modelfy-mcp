@@ -5,6 +5,7 @@ import { sha256Hex } from "../crypto";
 import { hourlyLimit } from "../limits";
 import { backendFor } from "../backend";
 import type { AppEnv } from "../env";
+import { layerText } from "./layer";
 import { buildServer } from "./server";
 import type { Session } from "./session";
 
@@ -61,6 +62,7 @@ export const mcpApiHandler = {
       env,
       owner,
       backend: backendFor(props, env, owner),
+      layer: layerText(props.agentLayer),
       revoke: () => revokeConnection(env, auth),
     };
     const handler = createMcpHandler(() => buildServer(session), {
