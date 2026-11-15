@@ -7,6 +7,7 @@ import { authorize, callback, pendingRequest } from "./auth/routes";
 import { createSandboxKey } from "./auth/sandbox-keys";
 import type { AppEnv } from "./env";
 import { mcpApiHandler } from "./mcp/handler";
+import { homePage } from "./pages/home";
 import { sandboxRoute } from "./sandbox-routes";
 
 const MCP_RESOURCE = `${env.PUBLIC_URL}/mcp`;
@@ -15,6 +16,9 @@ const MCP_RESOURCE = `${env.PUBLIC_URL}/mcp`;
 const defaultHandler = {
   async fetch(request: Request, appEnv: AppEnv): Promise<Response> {
     const { pathname } = new URL(request.url);
+    if (request.method === "GET" && pathname === "/") {
+      return homePage(appEnv.PUBLIC_URL);
+    }
     if (request.method === "GET" && pathname === "/authorize") {
       return authorize(request, appEnv);
     }
