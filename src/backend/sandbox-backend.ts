@@ -107,7 +107,8 @@ export class SandboxBackend implements PhotoBackend {
       ? env.SANDBOX_ACCOUNT_KEY
       : props.apiToken;
     this.#catalog =
-      catalogToken !== null && catalogToken !== ""
+      // SANDBOX_ACCOUNT_KEY may be unset: the sandbox then uses its fixtures
+      typeof catalogToken === "string" && catalogToken !== ""
         ? new ApiBackend(env, props, catalogToken)
         : null;
   }
