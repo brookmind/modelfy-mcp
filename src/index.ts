@@ -6,6 +6,7 @@ import { oauthOptions } from "./auth/oauth-options";
 import { authorize, callback, pendingRequest } from "./auth/routes";
 import { createSandboxKey } from "./auth/sandbox-keys";
 import type { AppEnv } from "./env";
+import { mcpApiHandler } from "./mcp/handler";
 
 const MCP_RESOURCE = `${env.PUBLIC_URL}/mcp`;
 
@@ -35,17 +36,10 @@ const defaultHandler = {
   },
 };
 
-/** The MCP endpoint; reached only with a valid token (Task 4 serves it). */
-const mcpHandler = {
-  fetch(): Response {
-    return new Response("Not implemented", { status: 501 });
-  },
-};
-
 export default new OAuthProvider<AppEnv>({
   ...oauthOptions,
   apiRoute: "/mcp",
-  apiHandler: mcpHandler,
+  apiHandler: mcpApiHandler,
   defaultHandler,
   resourceMetadata: { resource: MCP_RESOURCE, resource_name: "Modelfy" },
   resolveExternalToken: (input) => resolveApiKey(input, MCP_RESOURCE),

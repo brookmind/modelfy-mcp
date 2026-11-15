@@ -1,5 +1,10 @@
 import { exports } from "cloudflare:workers";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { vi } from "vitest";
+import { z } from "zod";
 
 export const ORIGIN = "https://mcp.test";
 
@@ -123,4 +128,48 @@ export async function startAuthorization(
     throw new Error(`No redirect from /authorize: ${response.status}`);
   }
   return { verifier, location: new URL(location) };
+}
+
+const AccessToken = z.object({ access_token: z.string() });
+
+/**
+ * Runs the whole OAuth flow for a client (the API redeem must be answered by
+ * the active `mockApi` handler) and returns an access token for /mcp.
+ */
+export async function oauthAccessToken(): Promise<string> {
+  const client = await registerClient();
+  const { verifier, location } = await startAuthorization(client);
+  const state = location.searchParams.get("state") ?? "";
+  const back = await call(`/callback?state=${state}&code=code-1`, {
+    redirect: "manual",
+  });
+  const code =
+    new URL(back.headers.get("Location") ?? "").searchParams.get("code") ?? "";
+  const response = await call("/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: client.redirectUri,
+      client_id: client.clientId,
+      code_verifier: verifier,
+      resource: `${ORIGIN}/mcp`,
+    }).toString(),
+  });
+  return AccessToken.parse(await response.json()).access_token;
+}
+
+/** An MCP client connected to the Worker's /mcp with a bearer token. */
+export async function connect(token: string): Promise<Client> {
+  const client = new Client({ name: "test-agent", version: "1.0.0" });
+  const transport = new StreamableHTTPClientTransport(
+    new URL(`${ORIGIN}/mcp`),
+    {
+      fetch: (input, init) => exports.default.fetch(new Request(input, init)),
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    },
+  );
+  await client.connect(transport);
+  return client;
 }
