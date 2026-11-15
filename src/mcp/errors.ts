@@ -1,19 +1,24 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
+import { z } from "zod";
 import { ApiFailure } from "../api/client";
 
-export type AgentErrorCode =
-  | "INSUFFICIENT_CREDITS"
-  | "BUDGET_EXCEEDED"
-  | "QUOTE_EXPIRED"
-  | "QUOTE_NOT_YOURS"
-  | "CONFIRMATION_REQUIRED"
-  | "CONNECTION_REVOKED"
-  | "MISSING_CHOICE"
-  | "INVALID_INPUT"
-  | "NOT_FOUND"
-  | "PHOTO_REJECTED"
-  | "RATE_LIMITED"
-  | "MODELFY_ERROR";
+/** Every code a tool can return; docs/errors.md has a section for each. */
+export const AgentErrorCodeSchema = z.enum([
+  "INSUFFICIENT_CREDITS",
+  "BUDGET_EXCEEDED",
+  "QUOTE_EXPIRED",
+  "QUOTE_NOT_YOURS",
+  "CONFIRMATION_REQUIRED",
+  "CONNECTION_REVOKED",
+  "MISSING_CHOICE",
+  "INVALID_INPUT",
+  "NOT_FOUND",
+  "PHOTO_REJECTED",
+  "RATE_LIMITED",
+  "MODELFY_ERROR",
+]);
+
+export type AgentErrorCode = z.infer<typeof AgentErrorCodeSchema>;
 
 /** An error the agent can act on: a stable code, a plain message, the next step. */
 export class AgentError extends Error {

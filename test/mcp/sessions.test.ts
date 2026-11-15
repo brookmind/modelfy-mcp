@@ -202,6 +202,7 @@ describe("plan, generate and follow photo sessions", () => {
       "create_upload_session",
       "generate_photos",
       "get_account",
+      "get_docs",
       "get_photo_options",
       "get_photo_session",
       "get_uploaded_photos",
