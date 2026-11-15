@@ -3,6 +3,14 @@ import { z } from "zod";
 export const TokenKindSchema = z.enum(["oauth", "live", "test", "anonymous"]);
 export type TokenKind = z.infer<typeof TokenKindSchema>;
 
+/** A sandbox key that spends like a person in a chat or like a budgeted bot */
+export const ActsAsSchema = z.enum(["person", "bot"]);
+export type ActsAs = z.infer<typeof ActsAsSchema>;
+
+/** Which agent-facing text a connection gets; "bare" exists for evals only */
+export const AgentLayerSchema = z.enum(["v0", "bare"]);
+export type AgentLayer = z.infer<typeof AgentLayerSchema>;
+
 const BudgetSchema = z.object({
   maxCreditsPerSession: z.number(),
   maxCreditsPerDay: z.number(),
@@ -19,6 +27,9 @@ export const GrantPropsSchema = z.object({
   apiToken: z.string().nullable(),
   sandboxId: z.string().nullable(),
   budget: BudgetSchema.nullable(),
+  // Defaults keep grants stored before these fields existed valid
+  actsAs: ActsAsSchema.nullable().default(null),
+  agentLayer: AgentLayerSchema.default("v0"),
 });
 export type GrantProps = z.infer<typeof GrantPropsSchema>;
 

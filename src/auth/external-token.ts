@@ -7,7 +7,7 @@ import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
 import { sha256Hex } from "../crypto";
 import type { GrantProps } from "./props";
-import { readSandboxKey } from "./sandbox-keys";
+import { readSandboxKey, SANDBOX_BOT_BUDGET } from "./sandbox-keys";
 
 const KEY_PATTERN = /^mfy_(live|test)_[0-9A-Za-z]{43}$/;
 const CACHE_SECONDS = 60;
@@ -58,7 +58,9 @@ export async function resolveApiKey(
       userId: null,
       apiToken: null,
       sandboxId: sandbox.sandboxId,
-      budget: null,
+      budget: sandbox.actsAs === "bot" ? SANDBOX_BOT_BUDGET : null,
+      actsAs: sandbox.actsAs,
+      agentLayer: sandbox.agentLayer,
     };
     return { props, audience: resource };
   }
@@ -110,6 +112,8 @@ export async function resolveApiKey(
     apiToken: token,
     sandboxId: resolved.kind === "test" ? `user:${resolved.userId}` : null,
     budget: resolved.budget,
+    actsAs: null,
+    agentLayer: "v0",
   };
   return { props, audience: resource };
 }
