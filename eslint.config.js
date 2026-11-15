@@ -32,7 +32,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ["eslint.config.js"],
+    files: ["eslint.config.js", "scripts/**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    // Node build scripts: plain JavaScript
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { console: "readonly", process: "readonly" },
+    },
+    rules: { "@typescript-eslint/explicit-function-return-type": "off" },
   },
 );

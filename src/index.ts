@@ -5,6 +5,7 @@ import { resolveApiKey } from "./auth/external-token";
 import { oauthOptions } from "./auth/oauth-options";
 import { authorize, callback, pendingRequest } from "./auth/routes";
 import { createSandboxKey } from "./auth/sandbox-keys";
+import { docsRoute } from "./docs/routes";
 import type { AppEnv } from "./env";
 import { mcpApiHandler } from "./mcp/handler";
 import { homePage } from "./pages/home";
@@ -37,6 +38,11 @@ const defaultHandler = {
     if (request.method === "POST" && pathname === "/sandbox/keys") {
       return createSandboxKey(request, appEnv);
     }
+    const docs = docsRoute(request, {
+      publicUrl: appEnv.PUBLIC_URL,
+      webUrl: appEnv.WEB_URL,
+    });
+    if (docs !== null) return docs;
     const sandbox = await sandboxRoute(request, appEnv);
     if (sandbox !== null) return sandbox;
     return new Response("Not found", { status: 404 });

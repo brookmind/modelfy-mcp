@@ -8,6 +8,38 @@ https://mcp.modelfy.ai/mcp
 
 It runs on Cloudflare Workers. People connect once and are not asked to sign in again; agents get keys without anyone copying them; and no credit is spent without consent.
 
+## Add it to your agent
+
+Claude Code:
+
+```sh
+claude mcp add --transport http --scope user modelfy https://mcp.modelfy.ai/mcp
+```
+
+Then `/mcp` → `modelfy` → sign in with your Modelfy account.
+
+Optional: the Claude Code plugin adds a skill that teaches Claude the whole photo workflow (and brings the server with it):
+
+```
+/plugin marketplace add brookmind/modelfy-mcp
+/plugin install modelfy@modelfy
+```
+
+claude.ai, Claude Desktop, ChatGPT, Cursor, VS Code, Codex, Antigravity (formerly Gemini CLI), Zed, Cline and your own agent: **[Connect your agent](docs/connect.md)**.
+
+## Docs
+
+| Page                                   | For                                         |
+| -------------------------------------- | ------------------------------------------- |
+| [Quickstart](docs/quickstart.md)       | What it does and a first session            |
+| [Connect your agent](docs/connect.md)  | Every client, step by step                  |
+| [Keys and sign-in](docs/keys.md)       | OAuth, sandbox keys, device login, API keys |
+| [Create photos](docs/photos.md)        | The workflow and its rules                  |
+| [Credits and consent](docs/credits.md) | Quotes, confirmation, budgets, refunds      |
+| [Errors](docs/errors.md)               | Every error code and what to do             |
+
+The same pages are served by the server itself, so agents never need this repo: `get_docs` (a tool), `modelfy://docs/<page>` (MCP resources), [`/docs`](https://mcp.modelfy.ai/docs), [`/llms.txt`](https://mcp.modelfy.ai/llms.txt) and [`/llms-full.txt`](https://mcp.modelfy.ai/llms-full.txt). Each page is also Markdown at `/docs/<page>.md`. `npm run docs:build` compiles `docs/*.md` into the Worker; CI fails if they drift.
+
 ## What an agent can do
 
 | Tool                                                     | What it does                                                               | Spends credits |
@@ -20,6 +52,7 @@ It runs on Cloudflare Workers. People connect once and are not asked to sign in 
 | `generate_photos`                                        | Launches the planned session (needs the quote)                             | **yes**        |
 | `get_photo_session`                                      | Progress and finished photos; can wait until done                          | no             |
 | `list_recent_photos` · `cancel_photo_session`            | Recent photos; stop a session (unstarted photos are refunded)              | refunds        |
+| `get_docs`                                               | The documentation below, by topic                                          | no             |
 
 The server sends its own instructions on connect, tailored to the kind of connection, and every error carries a stable `code`, a `next_step` the agent can act on and a `docs_url`.
 

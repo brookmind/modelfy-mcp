@@ -1,4 +1,5 @@
 import type { TokenKind } from "../auth/props";
+import { DOC_SLUGS } from "../docs";
 
 const WORKFLOW = `Modelfy creates product photos: a product on a model in a real place, or on a plain studio background.
 
@@ -9,7 +10,9 @@ Workflow:
 4. generate_photos with the quote_id.
 5. get_photo_session with wait_seconds until it is done, then show the photos.
 
-Rules: never invent model, background or upload ids; use the ids the tools return. Send image bytes from code, never as base64 through the model. Reply in the person's language.`;
+Rules: never invent model, background or upload ids; use the ids the tools return. Send image bytes from code, never as base64 through the model. Reply in the person's language.
+
+Docs: get_docs has the full guide (topics: ${DOC_SLUGS.join(", ")}). After an error, follow its next_step; get_docs with topic "errors" explains every code.`;
 
 const CONSENT: Record<TokenKind, string> = {
   oauth:

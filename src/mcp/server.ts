@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { instructionsFor } from "./instructions";
 import type { Session } from "./session";
 import { registerAccountTools } from "./tools/account";
+import { registerDocs } from "./tools/docs";
 import { registerPhotoInputTools } from "./tools/photos-in";
 import { registerSessionTools } from "./tools/sessions";
 
@@ -15,5 +16,6 @@ export function buildServer(session: Session): McpServer {
   registerAccountTools(server, session);
   registerPhotoInputTools(server, session);
   registerSessionTools(server, session);
+  registerDocs(server, session);
   return server;
 }
