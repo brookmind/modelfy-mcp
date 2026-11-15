@@ -53,6 +53,12 @@ The result is a before/after table that anyone can rerun.
 - `ANTHROPIC_API_KEY` comes from the owner's Bitwarden, handed over with a
   one-use secret card at run time; the runner reads it from the environment.
 - All repo text in English.
+- The Cloudflare account stays on **Workers Free** (owner, 2026-11-16): 1,000
+  KV writes per day. Even with the rate limits off KV (below), each run still
+  writes quotes, sandbox sessions and uploads (about 8 writes). The runner
+  estimates the writes each run makes, keeps a daily tally (UTC), and stops
+  before ~900 so other dev use keeps working; a run resumes the next day from
+  where it stopped. The baseline may take two days.
 
 ## Approaches considered
 
