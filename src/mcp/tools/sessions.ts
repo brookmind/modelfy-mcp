@@ -4,6 +4,7 @@ import { SHOT_TYPES, type SessionStatus } from "../../backend/types";
 import { AgentError } from "../errors";
 import { markLaunched, readQuote, saveQuote } from "../quotes";
 import { guarded, respond, type Session } from "../session";
+import { spendingRule } from "../spending";
 
 const MAX_WAIT_SECONDS = 45;
 const POLL_MS = 2000;
@@ -210,7 +211,7 @@ export function registerSessionTools(
                 ),
               };
         const ask =
-          session.props.kind === "oauth"
+          spendingRule(session.props) === "person"
             ? " Ask the person before calling generate_photos with user_confirmed: true."
             : "";
         return respond(
@@ -274,7 +275,10 @@ export function registerSessionTools(
           const existing = await session.backend.session(quote.sessionId);
           return respond(statusSentence(existing), { ...existing });
         }
-        if (session.props.kind === "oauth" && user_confirmed !== true) {
+        if (
+          spendingRule(session.props) === "person" &&
+          user_confirmed !== true
+        ) {
           throw new AgentError(
             "CONFIRMATION_REQUIRED",
             `This launch spends ${quote.plan.credits} credits for ${quote.plan.photos} photos and needs the person's yes.`,

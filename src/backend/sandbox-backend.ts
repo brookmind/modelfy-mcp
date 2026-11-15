@@ -15,6 +15,7 @@ import type {
   Account,
   AddedPhoto,
   Background,
+  Budget,
   FileToUpload,
   Model,
   PhotoBackend,
@@ -67,6 +68,19 @@ function sessionsOfKey(owner: string): string {
   return `sbx-sessions:${owner}`;
 }
 
+const SPENT_TTL_SECONDS = 2 * 24 * 60 * 60;
+
+function nextUtcMidnight(now: Date = new Date()): Date {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  return next;
+}
+
+/** Credits a bot key launched today (UTC), like a live key's daily spend. */
+function spentKey(owner: string, now: Date = new Date()): string {
+  return `sbx-spent:${owner}:${now.toISOString().slice(0, 10)}`;
+}
+
 export async function readUploadState(
   kv: KVNamespace,
   id: string,
@@ -113,15 +127,65 @@ export class SandboxBackend implements PhotoBackend {
         : null;
   }
 
-  account(): Promise<Account> {
-    return Promise.resolve({
+  async account(): Promise<Account> {
+    return {
       credits: SANDBOX_CREDITS,
       plan: "Sandbox",
       creditsPerPhoto: SANDBOX_PRICE_PER_PHOTO,
       keyKind: this.#props.kind,
       sandbox: true,
-      budget: null,
+      budget: await this.#budget(),
+    };
+  }
+
+  /** A bot key's budget, like a live key's: per session and per UTC day. */
+  async #budget(): Promise<Budget | null> {
+    const limits = this.#props.budget;
+    if (limits === null) return null;
+    return {
+      ...limits,
+      spentToday: await this.#spentToday(),
+      resetsAt: nextUtcMidnight().toISOString(),
+    };
+  }
+
+  async #spentToday(): Promise<number> {
+    const value = await this.#env.OAUTH_KV.get(spentKey(this.#owner));
+    const spent = Number(value ?? "0");
+    return Number.isFinite(spent) ? spent : 0;
+  }
+
+  /** Refuses a launch over the budget, as the Modelfy API does for live keys. */
+  async #spend(credits: number): Promise<void> {
+    const budget = await this.#budget();
+    if (budget === null) return;
+    const details = (limit: "session" | "day"): Record<string, unknown> => ({
+      budget: { limit, requested: credits, ...budget },
     });
+    const nextStep =
+      "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.";
+    if (credits > budget.maxCreditsPerSession) {
+      throw new AgentError(
+        "BUDGET_EXCEEDED",
+        `This launch needs ${credits} credits; this key allows ${budget.maxCreditsPerSession} per photo session.`,
+        nextStep,
+        details("session"),
+      );
+    }
+    const left = budget.maxCreditsPerDay - budget.spentToday;
+    if (credits > left) {
+      throw new AgentError(
+        "BUDGET_EXCEEDED",
+        `This launch needs ${credits} credits; this key has ${Math.max(0, left)} left today.`,
+        nextStep,
+        details("day"),
+      );
+    }
+    await this.#env.OAUTH_KV.put(
+      spentKey(this.#owner),
+      String(budget.spentToday + credits),
+      { expirationTtl: SPENT_TTL_SECONDS },
+    );
   }
 
   async models(): Promise<Model[]> {
@@ -276,6 +340,7 @@ export class SandboxBackend implements PhotoBackend {
   }
 
   async launch(plan: StoredPlan): Promise<SessionStatus> {
+    await this.#spend(plan.credits);
     const id = `sbx_${randomBase64Url(12)}`;
     const name = plan.launchBody.sandboxName;
     const session: SandboxSession = {
