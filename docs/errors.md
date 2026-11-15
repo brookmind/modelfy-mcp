@@ -57,7 +57,7 @@ The id does not exist for this account (a session, an upload). List the items ag
 
 ### PHOTO_REJECTED
 
-A product photo could not be used: the link is not public, it is not an image file (JPEG, PNG, WebP, HEIC), it is over 15 MB, or the upload to Modelfy failed. `add_product_photos` reports this per link. Use a public https link to the image file itself, or upload the file with `create_upload_session`.
+A product photo link could not be used: it is not public, it is not an image file (JPEG, PNG, WebP, HEIC), it is over 15 MB, or the upload to Modelfy failed. `add_product_photos` does not fail for this: the call succeeds, and each link that could not be used comes back with an `error` message next to its `source_url` instead of an `upload_id`. Use a public https link to the image file itself, or upload the file with `create_upload_session`.
 
 ### CONNECTION_REVOKED
 

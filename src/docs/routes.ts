@@ -83,21 +83,31 @@ export function docsRoute(request: Request, urls: DocUrls): Response | null {
   if (pathname === "/llms-full.txt") {
     return markdownResponse(llmsFullTxt(urls), "text/plain");
   }
+  const acceptsMarkdown = (request.headers.get("Accept") ?? "").includes(
+    "text/markdown",
+  );
   if (pathname === "/docs" || pathname === "/docs/") {
-    const accept = request.headers.get("Accept") ?? "";
-    return accept.includes("text/markdown")
-      ? markdownResponse(llmsTxt(urls))
-      : indexHtml();
+    return negotiated(
+      acceptsMarkdown ? markdownResponse(llmsTxt(urls)) : indexHtml(),
+    );
   }
   const match = /^\/docs\/([a-z0-9-]+)(\.md)?$/.exec(pathname);
   if (match === null) return null;
   const [, slug = "", extension] = match;
   const page = findDoc(slug);
   if (page === null) return null;
-  const wantsMarkdown =
-    extension !== undefined ||
-    (request.headers.get("Accept") ?? "").includes("text/markdown");
-  return wantsMarkdown
-    ? markdownResponse(docMarkdown(page, urls))
-    : pageHtml(page, urls);
+  if (extension !== undefined) {
+    return markdownResponse(docMarkdown(page, urls));
+  }
+  return negotiated(
+    acceptsMarkdown
+      ? markdownResponse(docMarkdown(page, urls))
+      : pageHtml(page, urls),
+  );
+}
+
+/** HTML or Markdown by Accept: caches must keep them apart. */
+function negotiated(response: Response): Response {
+  response.headers.set("Vary", "Accept");
+  return response;
 }

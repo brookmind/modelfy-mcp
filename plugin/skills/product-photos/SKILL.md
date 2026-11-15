@@ -15,7 +15,7 @@ The `modelfy` MCP server does the work; this skill is how to use it well. When u
 ## The workflow
 
 1. **Product photos in.**
-   - Links to the product's images: `add_product_photos` with the image file URLs (not product pages).
+   - Links to the product's images: `add_product_photos` with the image file URLs (not product pages). A link that cannot be used comes back with an `error` instead of an `upload_id`: ask for another link, or upload the file.
    - Files on this computer: `create_upload_session` with each file's `content_type` and `bytes`, then upload every file yourself with `curl -X PUT "<put_url>" -H "<each returned header>" --data-binary @<file>`. Never read an image into the conversation or send it as base64.
    - Then `get_uploaded_photos` until nothing is pending. Use only the `upload_id`s it returns.
 2. **Choices.** `get_photo_options` for formats and limits; `list_models` (only `ready: true`) and `list_backgrounds` when the person wants a model or a known place. Never invent an id.
@@ -31,7 +31,6 @@ Every error has a `code` and a `next_step`: follow the `next_step`. The usual on
 - `CONFIRMATION_REQUIRED`: you skipped the person's yes. Ask, then retry with `user_confirmed: true`.
 - `QUOTE_EXPIRED`: quotes last 30 minutes. Plan again; ask again if the price changed.
 - `INSUFFICIENT_CREDITS` or `BUDGET_EXCEEDED`: tell the person and offer fewer photos.
-- `PHOTO_REJECTED`: the link is not a public image file. Ask for another, or upload the file.
 
 Retrying `generate_photos` with the same `quote_id` never charges twice.
 

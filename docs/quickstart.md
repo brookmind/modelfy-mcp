@@ -22,7 +22,7 @@ In Claude Code:
 claude mcp add --transport http --scope user modelfy https://mcp.modelfy.ai/mcp
 ```
 
-Then run `/mcp`, pick `modelfy` and sign in with your Modelfy account. Other clients (claude.ai, ChatGPT, Cursor, VS Code, Codex, Gemini CLI, your own agent) are in [Connect your agent](connect.md).
+Then run `/mcp`, pick `modelfy` and sign in with your Modelfy account. Other clients (claude.ai, ChatGPT, Cursor, VS Code, Codex, Antigravity, Zed, Cline, your own agent) are in [Connect your agent](connect.md).
 
 No account yet? Get a free sandbox key and use it as a Bearer token. Nothing is spent and the photos are samples:
 

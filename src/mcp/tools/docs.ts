@@ -8,6 +8,7 @@ import {
   findDoc,
   type DocUrls,
 } from "../../docs";
+import { AgentError, errorResult } from "../errors";
 import type { Session } from "../session";
 
 const DocsInput = z.object({
@@ -55,10 +56,16 @@ export function registerDocs(server: McpServer, session: Session): void {
       }
       const page = findDoc(topic);
       if (page === null) {
-        return Promise.resolve({
-          ...text(`Unknown topic "${topic}". ${topicList(urls)}`),
-          isError: true,
-        });
+        return Promise.resolve(
+          errorResult(
+            new AgentError(
+              "INVALID_INPUT",
+              `There is no docs topic "${topic}".`,
+              `Call get_docs with one of: ${DOC_SLUGS.join(", ")}.`,
+            ),
+            urls.publicUrl,
+          ),
+        );
       }
       return Promise.resolve(
         text(`${docMarkdown(page, urls)}\nSource: ${docUrl(page.slug, urls)}`),

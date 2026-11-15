@@ -25,7 +25,7 @@ Optional: the Claude Code plugin adds a skill that teaches Claude the whole phot
 /plugin install modelfy@modelfy
 ```
 
-claude.ai, Claude Desktop, ChatGPT, Cursor, VS Code, Codex, Gemini CLI, Windsurf and your own agent: **[Connect your agent](docs/connect.md)**.
+claude.ai, Claude Desktop, ChatGPT, Cursor, VS Code, Codex, Antigravity (formerly Gemini CLI), Zed, Cline and your own agent: **[Connect your agent](docs/connect.md)**.
 
 ## Docs
 

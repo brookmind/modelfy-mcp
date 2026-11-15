@@ -78,12 +78,24 @@ describe("the docs on the web", () => {
     expect((await call("/docs/nope.md")).status).toBe(404);
   });
 
-  it("the index lists every page", async () => {
-    const body = await (await call("/docs")).text();
+  it("the index lists every page, or is llms.txt for Markdown readers", async () => {
+    const html = await call("/docs");
+    const markdown = await call("/docs", {
+      headers: { Accept: "text/markdown" },
+    });
+    const body = await html.text();
 
     for (const page of DOC_PAGES) {
       expect(body).toContain(`href="/docs/${page.slug}"`);
     }
+    expect(markdown.headers.get("Content-Type")).toContain("text/markdown");
+    expect(await markdown.text()).toBe(await (await call("/llms.txt")).text());
+  });
+
+  it("responses chosen by Accept tell caches to vary on it", async () => {
+    expect((await call("/docs")).headers.get("Vary")).toBe("Accept");
+    expect((await call("/docs/credits")).headers.get("Vary")).toBe("Accept");
+    expect((await call("/docs/credits.md")).headers.get("Vary")).toBeNull();
   });
 });
 
@@ -107,16 +119,21 @@ describe("the docs inside the MCP connection", () => {
     );
   });
 
-  it("an unknown topic is an error that lists the real ones", async () => {
+  it("an unknown topic is an INVALID_INPUT error that names the real ones", async () => {
     const client = await connect(await sandboxKey());
 
     const result = await client.callTool({
       name: "get_docs",
       arguments: { topic: "pricing" },
     });
+    const text = textOf(result.content);
 
     expect(result.isError).toBe(true);
-    expect(textOf(result.content)).toContain("- credits: ");
+    expect(text).toContain("INVALID_INPUT");
+    expect(text).toContain(
+      '"docs_url":"https://mcp.test/docs/errors#INVALID_INPUT"',
+    );
+    for (const page of DOC_PAGES) expect(text).toContain(page.slug);
   });
 
   it("each page is also a resource", async () => {
