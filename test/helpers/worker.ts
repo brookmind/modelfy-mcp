@@ -34,12 +34,14 @@ export interface ApiCall {
  */
 export function mockApi(
   handle: (call: ApiCall) => Response | Promise<Response>,
+  other?: (request: Request) => Response | Promise<Response>,
 ): ApiCall[] {
   const calls: ApiCall[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
     if (url.origin !== "https://api.test") {
+      if (other !== undefined) return other(request);
       throw new Error(`Unexpected request: ${request.method} ${request.url}`);
     }
     const text = await request.text();

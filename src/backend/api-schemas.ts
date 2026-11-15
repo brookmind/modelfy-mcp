@@ -68,3 +68,24 @@ export const ShootOptionsSchema = z.object({
   }),
   castMax: z.number(),
 });
+
+export const CreatedUploadSchema = z.object({
+  uploadId: z.string(),
+  uploadUrl: z.string(),
+  headers: z.record(z.string(), z.string()),
+  expiresAt: z.string(),
+});
+
+export const ConfirmedUploadSchema = z.object({ uploadId: z.string() });
+
+export const UploadSessionSchema = z.object({
+  id: z.string(),
+  pageUrl: z.string(),
+  expiresAt: z.string(),
+});
+
+export const UploadSessionStateSchema = z.object({
+  confirmed: z.array(z.object({ uploadId: z.string() })),
+  pending: z.number(),
+  rejected: z.array(z.object({ uploadId: z.string(), reason: z.string() })),
+});
