@@ -7,6 +7,7 @@ import { authorize, callback, pendingRequest } from "./auth/routes";
 import { createSandboxKey } from "./auth/sandbox-keys";
 import type { AppEnv } from "./env";
 import { mcpApiHandler } from "./mcp/handler";
+import { sandboxRoute } from "./sandbox-routes";
 
 const MCP_RESOURCE = `${env.PUBLIC_URL}/mcp`;
 
@@ -32,6 +33,8 @@ const defaultHandler = {
     if (request.method === "POST" && pathname === "/sandbox/keys") {
       return createSandboxKey(request, appEnv);
     }
+    const sandbox = await sandboxRoute(request, appEnv);
+    if (sandbox !== null) return sandbox;
     return new Response("Not found", { status: 404 });
   },
 };

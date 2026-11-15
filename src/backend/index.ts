@@ -1,9 +1,20 @@
 import type { GrantProps } from "../auth/props";
 import { ApiBackend } from "./api-backend";
+import { SandboxBackend } from "./sandbox-backend";
 import type { PhotoBackend } from "./types";
 
-/** The backend a connection works with (the sandbox arrives in Task 7). */
-export function backendFor(props: GrantProps, env: Env): PhotoBackend {
-  const token = props.apiToken ?? env.SANDBOX_ACCOUNT_KEY;
-  return new ApiBackend(env, props, token);
+/** Test and anonymous keys get the sandbox; everyone else the Modelfy API. */
+export function backendFor(
+  props: GrantProps,
+  env: Env,
+  owner: string,
+): PhotoBackend {
+  if (
+    props.kind === "test" ||
+    props.kind === "anonymous" ||
+    props.apiToken === null
+  ) {
+    return new SandboxBackend(env, props, owner);
+  }
+  return new ApiBackend(env, props, props.apiToken);
 }
