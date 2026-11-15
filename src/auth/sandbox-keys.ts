@@ -54,8 +54,11 @@ export async function createSandboxKey(
       expirationTtl: KEY_TTL_SECONDS,
     },
   );
-  return Response.json({
-    api_key: apiKey,
-    expires_at: new Date(Date.now() + KEY_TTL_SECONDS * 1000).toISOString(),
-  });
+  return Response.json(
+    {
+      api_key: apiKey,
+      expires_at: new Date(Date.now() + KEY_TTL_SECONDS * 1000).toISOString(),
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

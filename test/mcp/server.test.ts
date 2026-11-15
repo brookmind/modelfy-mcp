@@ -6,6 +6,7 @@ import {
   json,
   mockApi,
   oauthAccessToken,
+  registerClient,
   type ApiCall,
 } from "../helpers/worker";
 
@@ -284,5 +285,64 @@ describe("the MCP server", () => {
       .join("\n");
     expect(text).toContain("CONNECTION_REVOKED");
     expect(after.status).toBe(401);
+  });
+
+  it("a 401 on one device's grant leaves the same client's other grant working", async () => {
+    const tokens = [
+      `mfy_oauth_${"B".repeat(43)}`,
+      `mfy_oauth_${"C".repeat(43)}`,
+    ];
+    let redeemed = 0;
+    mockApi((request) => {
+      if (request.path === "/v2/connections/codes/redeem") {
+        const token = tokens[redeemed] ?? "";
+        redeemed += 1;
+        return json(200, { data: { userId: "user-1", token } });
+      }
+      if (request.authorization === `Bearer ${tokens[0] ?? ""}`) {
+        return json(401, { error: "UNAUTHORIZED" });
+      }
+      return api(request);
+    });
+    const client = await registerClient();
+    const first = await connect(await oauthAccessToken(client));
+    const second = await connect(await oauthAccessToken(client));
+
+    const revoked = await first.callTool({
+      name: "get_account",
+      arguments: {},
+    });
+    const still = await second.callTool({ name: "get_account", arguments: {} });
+
+    expect(revoked.isError).toBe(true);
+    expect(still.isError).not.toBe(true);
+  });
+
+  it("a wrong server secret is a server error, never a reason to sign people out", async () => {
+    let secretBroken = false;
+    mockApi((request) =>
+      secretBroken && request.path !== "/v2/connections/codes/redeem"
+        ? json(401, { error: "MCP_SECRET_INVALID" })
+        : api(request),
+    );
+    const token = await oauthAccessToken();
+    const client = await connect(token);
+    secretBroken = true;
+
+    const result = await client.callTool({
+      name: "get_account",
+      arguments: {},
+    });
+    secretBroken = false;
+    const after = await client.callTool({ name: "get_account", arguments: {} });
+
+    const text = z
+      .array(z.object({ type: z.literal("text"), text: z.string() }))
+      .parse(result.content)
+      .map((part) => part.text)
+      .join("\n");
+    expect(text).toContain("MODELFY_ERROR");
+    expect(text).not.toContain("CONNECTION_REVOKED");
+    expect(after.isError).not.toBe(true);
   });
 });

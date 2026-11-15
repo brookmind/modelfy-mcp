@@ -1,4 +1,4 @@
-import { ModelfyApi } from "../api/client";
+import { ApiFailure, ModelfyApi } from "../api/client";
 import type { GrantProps } from "../auth/props";
 import { AgentError } from "../mcp/errors";
 import {
@@ -115,8 +115,14 @@ export class ApiBackend implements PhotoBackend {
       try {
         added.push({ source_url: url, upload_id: await this.#upload(url) });
       } catch (error) {
-        if (!(error instanceof AgentError)) throw error;
-        added.push({ source_url: url, error: error.message });
+        if (error instanceof AgentError) {
+          added.push({ source_url: url, error: error.message });
+        } else if (error instanceof ApiFailure && error.status === 400) {
+          // Modelfy rejected this file; the other links still go through
+          added.push({ source_url: url, error: `${url}: ${error.message}` });
+        } else {
+          throw error;
+        }
       }
     }
     return added;

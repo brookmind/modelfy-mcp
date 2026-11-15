@@ -307,7 +307,11 @@ export class SandboxBackend implements PhotoBackend {
 
   async cancel(sessionId: string): Promise<SessionStatus> {
     const session = await this.#load(sessionId);
-    const cancelled: SandboxSession = { ...session, cancelledAt: Date.now() };
+    // A second cancel keeps the first time, so a cancelled session stays cancelled
+    const cancelled: SandboxSession = {
+      ...session,
+      cancelledAt: session.cancelledAt ?? Date.now(),
+    };
     await this.#env.OAUTH_KV.put(
       sessionKey(sessionId),
       JSON.stringify(cancelled),

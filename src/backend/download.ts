@@ -3,6 +3,14 @@ import { AgentError } from "../mcp/errors";
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const TIMEOUT_MS = 20_000;
+/** The photo types Modelfy takes (the API's upload rules). */
+const ACCEPTED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
 const BLOCKED_SUFFIXES = [".localhost", ".local", ".internal", ".lan", ".home"];
 
 export interface DownloadedImage {
@@ -106,6 +114,9 @@ export async function safeImageFetch(raw: string): Promise<DownloadedImage> {
         .toLowerCase() ?? "";
     if (!contentType.startsWith("image/")) {
       throw rejected(raw, "not an image");
+    }
+    if (!ACCEPTED_TYPES.has(contentType)) {
+      throw rejected(raw, "not a jpg, png, webp or heic image");
     }
     return { contentType, bytes: await readCapped(response, raw) };
   }

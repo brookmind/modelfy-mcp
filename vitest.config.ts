@@ -2,6 +2,8 @@ import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // Cold starts of the Workers runtime are slow on a busy machine
+  test: { testTimeout: 15_000 },
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },

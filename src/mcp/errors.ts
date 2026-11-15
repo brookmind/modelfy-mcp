@@ -46,6 +46,13 @@ const BudgetDetails = (body: unknown): Record<string, unknown> | null => {
 /** Maps a Modelfy API failure to what the agent should do next. */
 export function fromApiFailure(failure: ApiFailure): AgentError {
   switch (true) {
+    case failure.status === 401 && failure.code === "MCP_SECRET_INVALID":
+      // This server is misconfigured; the person's connection is fine
+      return new AgentError(
+        "MODELFY_ERROR",
+        "Modelfy could not complete this right now.",
+        "Try again in a moment; if it keeps failing, tell the person.",
+      );
     case failure.status === 401:
       return new AgentError(
         "CONNECTION_REVOKED",

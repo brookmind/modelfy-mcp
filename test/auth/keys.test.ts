@@ -83,6 +83,14 @@ describe("API keys", () => {
     expect((await mcp(`mfy_live_${"X".repeat(43)}`)).status).toBe(401);
   });
 
+  it("an API outage while checking a key is 503, not a crash", async () => {
+    mockApi(() => json(503, { error: "UNAVAILABLE" }));
+
+    const response = await mcp(`mfy_live_${"Q".repeat(43)}`);
+
+    expect(response.status).toBe(503);
+  });
+
   it("an OAuth connection token sent as an API key is 401", async () => {
     mockApi(() => me("OAUTH"));
 
@@ -203,5 +211,50 @@ describe("device login (RFC 8628)", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid_request" });
+  });
+
+  it("device code is limited to 10 per hour per address", async () => {
+    mockApi(() =>
+      json(200, {
+        data: {
+          deviceCode: "dev-1",
+          userCode: "WDJB-MJHT",
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+          interval: 5,
+        },
+      }),
+    );
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const response = await call("/device/code", {
+        method: "POST",
+        headers: { "CF-Connecting-IP": "198.51.100.200" },
+      });
+      statuses.push(response.status);
+    }
+
+    expect(statuses.slice(0, 10).every((status) => status === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+  });
+
+  it("the key answer is never cached", async () => {
+    mockApi(() =>
+      json(200, {
+        data: { status: "approved", apiKey: LIVE, kind: "LIVE", budget: null },
+      }),
+    );
+
+    const token = await call("/device/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "device_code=dev-1",
+    });
+    const sandbox = await call("/sandbox/keys", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": "198.51.100.201" },
+    });
+
+    expect(token.headers.get("Cache-Control")).toBe("no-store");
+    expect(sandbox.headers.get("Cache-Control")).toBe("no-store");
   });
 });

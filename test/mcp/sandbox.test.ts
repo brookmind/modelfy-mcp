@@ -284,4 +284,37 @@ describe("the sandbox", () => {
 
     expect(response.status).toBe(429);
   });
+
+  it("cancelling a sandbox session twice keeps it cancelled", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(TEST_KEY);
+    const quote = Quote.parse(
+      (
+        await client.callTool({
+          name: "plan_photos",
+          arguments: { ...PLAN, products: [{ upload_ids: ["sbx_x"] }] },
+        })
+      ).structuredContent,
+    );
+    const sessionId = z.object({ session_id: z.string() }).parse(
+      (
+        await client.callTool({
+          name: "generate_photos",
+          arguments: { quote_id: quote.quote_id },
+        })
+      ).structuredContent,
+    ).session_id;
+
+    await client.callTool({
+      name: "cancel_photo_session",
+      arguments: { session_id: sessionId },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 4500));
+    const again = await client.callTool({
+      name: "cancel_photo_session",
+      arguments: { session_id: sessionId },
+    });
+
+    expect(again.structuredContent).toMatchObject({ status: "cancelled" });
+  }, 30_000);
 });

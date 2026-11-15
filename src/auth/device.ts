@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
+import { clientIp, hourlyLimit } from "../limits";
 
 const StartedSchema = z.object({
   deviceCode: z.string(),
@@ -44,8 +45,12 @@ async function field(request: Request, name: string): Promise<string | null> {
   }
 }
 
+const DEVICE_CODES_PER_IP_PER_HOUR = 10;
+/** Token answers must never be cached (RFC 6749 §5.1). */
+const NO_STORE = { "Cache-Control": "no-store" };
+
 function oauthError(error: string, status = 400): Response {
-  return Response.json({ error }, { status });
+  return Response.json({ error }, { status, headers: NO_STORE });
 }
 
 /** POST /device/code (design §4.4 step 1). */
@@ -53,6 +58,13 @@ export async function startDevice(
   request: Request,
   env: Env,
 ): Promise<Response> {
+  // Every code costs a call to the API with the server secret: limit per address
+  const allowed = await hourlyLimit(
+    env.OAUTH_KV,
+    `device-code:${clientIp(request)}`,
+    DEVICE_CODES_PER_IP_PER_HOUR,
+  );
+  if (!allowed) return oauthError("slow_down", 429);
   const clientName = (await field(request, "client_name")) ?? "An AI agent";
   let started: z.infer<typeof StartedSchema>;
   try {
@@ -102,9 +114,12 @@ export async function pollDevice(
     throw error;
   }
   if (result.status !== "approved") return oauthError(result.status);
-  return Response.json({
-    api_key: result.apiKey,
-    kind: result.kind === "LIVE" ? "live" : "test",
-    budget: result.budget,
-  });
+  return Response.json(
+    {
+      api_key: result.apiKey,
+      kind: result.kind === "LIVE" ? "live" : "test",
+      budget: result.budget,
+    },
+    { headers: NO_STORE },
+  );
 }

@@ -3,26 +3,26 @@ import { z } from "zod";
 import { parseProps } from "../auth/props";
 import { sha256Hex } from "../crypto";
 import { hourlyLimit } from "../limits";
-
-const ANONYMOUS_CALLS_PER_HOUR = 300;
 import { backendFor } from "../backend";
 import type { AppEnv } from "../env";
 import { buildServer } from "./server";
 import type { Session } from "./session";
 
-const GrantAuth = z.object({ userId: z.string(), clientId: z.string() });
+const ANONYMOUS_CALLS_PER_HOUR = 300;
 
-/** Ends the OAuth grants of this user and client, so the client signs in again. */
+const GrantAuth = z.object({ token: z.string(), userId: z.string() });
+
+/**
+ * Ends the grant of this request only (its access token is
+ * `userId:grantId:secret`), so the client signs in again. Other grants of the
+ * same user and client (another device) are left alone.
+ */
 async function revokeConnection(env: AppEnv, auth: unknown): Promise<void> {
   const parsed = GrantAuth.safeParse(auth);
   if (!parsed.success) return;
-  const { userId, clientId } = parsed.data;
-  const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-  for (const grant of grants.items) {
-    if (grant.clientId === clientId) {
-      await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-    }
-  }
+  const [tokenUser, grantId] = parsed.data.token.split(":");
+  if (tokenUser !== parsed.data.userId || grantId === undefined) return;
+  await env.OAUTH_PROVIDER.revokeGrant(grantId, parsed.data.userId);
 }
 
 /** POST /mcp, after the provider has checked the token and set ctx.props. */

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { safeImageFetch } from "../../src/backend/download";
 import { connect, json, mockApi, type ApiCall } from "../helpers/worker";
 
@@ -19,6 +20,18 @@ function me(): Response {
 
 function uploadsApi(call: ApiCall): Response {
   if (call.path === "/v2/connections/me") return me();
+  if (
+    call.path === "/v2/uploads" &&
+    typeof call.body === "object" &&
+    call.body !== null &&
+    "bytes" in call.body &&
+    call.body.bytes === 3
+  ) {
+    return json(400, {
+      error: "UPLOAD_REJECTED",
+      message: "Upload rejected: corrupt",
+    });
+  }
   if (call.path === "/v2/uploads") {
     return json(200, {
       data: {
@@ -92,6 +105,14 @@ function imageHost(request: Request): Response {
     return new Response(null, { status: 200 });
   if (url.pathname === "/dress.png") {
     return new Response(PNG, { headers: { "Content-Type": "image/png" } });
+  }
+  if (url.pathname === "/anim.gif") {
+    return new Response(PNG, { headers: { "Content-Type": "image/gif" } });
+  }
+  if (url.pathname === "/rejected.png") {
+    return new Response(new Uint8Array([1, 2, 3]), {
+      headers: { "Content-Type": "image/png" },
+    });
   }
   if (url.pathname === "/page.html") {
     return new Response("<html>", { headers: { "Content-Type": "text/html" } });
@@ -225,5 +246,41 @@ describe("product photo tools", () => {
       pending: 1,
       rejected: [{ upload_id: "up-8", reason: "corrupt" }],
     });
+  });
+
+  it("a type Modelfy does not take and an upload Modelfy rejects fail alone; the good photo is kept", async () => {
+    const calls = mockApi(uploadsApi, imageHost);
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "add_product_photos",
+      arguments: {
+        image_urls: [
+          "https://shop.test/anim.gif",
+          "https://shop.test/rejected.png",
+          "https://shop.test/dress.png",
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    const photos = z
+      .object({
+        photos: z.array(
+          z.object({
+            source_url: z.string(),
+            upload_id: z.string().optional(),
+            error: z.string().optional(),
+          }),
+        ),
+      })
+      .parse(result.structuredContent).photos;
+    expect(photos.map((photo) => photo.upload_id ?? "error")).toEqual([
+      "error",
+      "error",
+      "up-1",
+    ]);
+    expect(photos[0]?.error).toContain("jpg, png, webp or heic");
+    expect(calls.filter((call) => call.path === "/v2/uploads")).toHaveLength(2);
   });
 });

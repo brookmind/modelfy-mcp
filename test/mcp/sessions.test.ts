@@ -476,4 +476,27 @@ describe("plan, generate and follow photo sessions", () => {
       ],
     });
   });
+
+  it("only raster photos are sent as images (no SVG)", async () => {
+    mockApi(
+      sessionsApi(),
+      () =>
+        new Response("<svg/>", {
+          headers: { "Content-Type": "image/svg+xml" },
+        }),
+    );
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "get_photo_session",
+      arguments: { session_id: "shoot-1" },
+    });
+
+    expect(
+      z
+        .array(z.object({ type: z.string() }))
+        .parse(result.content)
+        .filter((part) => part.type === "image"),
+    ).toHaveLength(0);
+  });
 });

@@ -9,6 +9,13 @@ const MAX_WAIT_SECONDS = 45;
 const POLL_MS = 2000;
 const MAX_IMAGES = 4;
 const MAX_IMAGE_BYTES = 1024 * 1024;
+/** What chat clients render as images; anything else stays a link. */
+const RASTER_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
 
 const PlanInputSchema = z.object({
   products: z
@@ -147,8 +154,10 @@ async function imageContent(
   for (const photo of status.photos.slice(0, MAX_IMAGES)) {
     try {
       const response = await fetch(photo.url);
-      const type = response.headers.get("Content-Type") ?? "";
-      if (!response.ok || !type.startsWith("image/")) continue;
+      const type =
+        (response.headers.get("Content-Type") ?? "").split(";")[0]?.trim() ??
+        "";
+      if (!response.ok || !RASTER_TYPES.has(type)) continue;
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (bytes.byteLength > MAX_IMAGE_BYTES) continue;
       images.push({ type: "image", data: base64(bytes), mimeType: type });

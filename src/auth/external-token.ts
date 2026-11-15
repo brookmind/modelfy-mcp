@@ -1,6 +1,7 @@
-import type {
-  ResolveExternalTokenInput,
-  ResolveExternalTokenResult,
+import {
+  ExternalTokenError,
+  type ResolveExternalTokenInput,
+  type ResolveExternalTokenResult,
 } from "@cloudflare/workers-oauth-provider";
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
@@ -77,6 +78,13 @@ export async function resolveApiKey(
       );
     } catch (error) {
       if (error instanceof ApiFailure && error.status === 401) return null;
+      if (error instanceof ApiFailure) {
+        throw new ExternalTokenError("temporarily_unavailable", {
+          description: "Modelfy could not check this key right now. Try again.",
+          statusCode: 503,
+          headers: { "Retry-After": "30" },
+        });
+      }
       throw error;
     }
     if (current.kind === "OAUTH") return null;

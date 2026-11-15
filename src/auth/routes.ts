@@ -4,7 +4,7 @@ import {
 } from "@cloudflare/workers-oauth-provider";
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
-import { randomBase64Url } from "../crypto";
+import { randomBase64Url, sha256Hex } from "../crypto";
 import type { AppEnv } from "../env";
 import type { GrantProps } from "./props";
 
@@ -29,6 +29,28 @@ const StoredAuthRequestSchema = z.object({
 type StoredAuthRequest = z.infer<typeof StoredAuthRequestSchema>;
 
 const RedeemedSchema = z.object({ userId: z.string(), token: z.string() });
+
+/** One cookie per sign-in, so two sign-ins at once in a browser both work. */
+async function signInCookieName(state: string): Promise<string> {
+  return `__Host-mcp-signin-${(await sha256Hex(state)).slice(0, 24)}`;
+}
+
+function hasCookie(request: Request, name: string): boolean {
+  const header = request.headers.get("Cookie") ?? "";
+  return header
+    .split(";")
+    .some(
+      (part) =>
+        part.trim().startsWith(`${name}=`) && part.trim() !== `${name}=`,
+    );
+}
+
+function redirectWithCookie(location: string, cookie: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: location, "Set-Cookie": cookie },
+  });
+}
 
 function authRequestKey(state: string): string {
   return `auth-request:${state}`;
@@ -102,7 +124,12 @@ export async function authorize(
   consent.searchParams.set("state", state);
   consent.searchParams.set("client_id", authRequest.clientId);
   consent.searchParams.set("client_name", clientName);
-  return Response.redirect(consent.toString(), 302);
+  // The sign-in belongs to this browser: /callback requires this cookie, so a
+  // consent link sent to someone else cannot complete an attacker's request
+  return redirectWithCookie(
+    consent.toString(),
+    `${await signInCookieName(state)}=1; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${AUTH_REQUEST_TTL_SECONDS}`,
+  );
 }
 
 /**
@@ -116,6 +143,14 @@ export async function callback(
 ): Promise<Response> {
   const url = new URL(request.url);
   const state = url.searchParams.get("state") ?? "";
+  const cookieName = await signInCookieName(state);
+  if (!hasCookie(request, cookieName)) {
+    return page(
+      400,
+      "Finish signing in where you started",
+      "Open the link from your assistant again, in this browser.",
+    );
+  }
   const stored = await readAuthRequest(env, state);
   if (stored === null) {
     return page(
@@ -127,11 +162,12 @@ export async function callback(
   // One use only, whatever happens next
   await env.OAUTH_KV.delete(authRequestKey(state));
   const authRequest = toAuthRequest(stored.request);
+  const clearCookie = `${cookieName}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`;
 
   if (url.searchParams.get("error") === "access_denied") {
-    return Response.redirect(
+    return redirectWithCookie(
       authorizationErrorRedirect(authRequest, "access_denied"),
-      302,
+      clearCookie,
     );
   }
 
@@ -167,8 +203,10 @@ export async function callback(
     metadata: { clientName: stored.clientName },
     scope: authRequest.scope,
     props,
+    // Devices sharing a client id (claude.ai and Desktop) keep their own grants
+    revokeExistingGrants: false,
   });
-  return Response.redirect(redirectTo, 302);
+  return redirectWithCookie(redirectTo, clearCookie);
 }
 
 /**

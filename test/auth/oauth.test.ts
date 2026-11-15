@@ -3,6 +3,7 @@ import { z } from "zod";
 import { oauthOptions } from "../../src/auth/oauth-options";
 import {
   call,
+  callback,
   json,
   mockApi,
   ORIGIN,
@@ -41,13 +42,11 @@ describe("OAuth sign-in through the Modelfy web", () => {
   it("authorize, consent, callback and token exchange give an access and a refresh token", async () => {
     const calls = redeemOk();
     const client = await registerClient();
-    const { verifier, location } = await startAuthorization(client);
+    const started = await startAuthorization(client);
+    const { verifier, location } = started;
     const state = location.searchParams.get("state") ?? "";
 
-    const back = await call(
-      `/callback?state=${encodeURIComponent(state)}&code=code-1`,
-      { redirect: "manual" },
-    );
+    const back = await callback(started, "code=code-1");
     const toClient = new URL(back.headers.get("Location") ?? "");
     const token = await call("/oauth/token", {
       method: "POST",
@@ -83,13 +82,10 @@ describe("OAuth sign-in through the Modelfy web", () => {
   it("a used or unknown state is refused", async () => {
     redeemOk();
     const client = await registerClient();
-    const { location } = await startAuthorization(client);
-    const state = location.searchParams.get("state") ?? "";
+    const started = await startAuthorization(client);
 
-    await call(`/callback?state=${state}&code=code-1`, { redirect: "manual" });
-    const again = await call(`/callback?state=${state}&code=code-1`, {
-      redirect: "manual",
-    });
+    await callback(started, "code=code-1");
+    const again = await callback(started, "code=code-1");
     const unknown = await call("/callback?state=nope&code=code-1", {
       redirect: "manual",
     });
@@ -101,12 +97,9 @@ describe("OAuth sign-in through the Modelfy web", () => {
   it("access_denied returns to the client with the error", async () => {
     const calls = redeemOk();
     const client = await registerClient();
-    const { location } = await startAuthorization(client);
-    const state = location.searchParams.get("state") ?? "";
+    const started = await startAuthorization(client);
 
-    const back = await call(`/callback?state=${state}&error=access_denied`, {
-      redirect: "manual",
-    });
+    const back = await callback(started, "error=access_denied");
     const toClient = new URL(back.headers.get("Location") ?? "");
 
     expect(toClient.searchParams.get("error")).toBe("access_denied");
@@ -117,12 +110,9 @@ describe("OAuth sign-in through the Modelfy web", () => {
   it("a code the API refuses ends on an error page, not the client", async () => {
     mockApi(() => json(400, { error: "CODE_INVALID" }));
     const client = await registerClient();
-    const { location } = await startAuthorization(client);
-    const state = location.searchParams.get("state") ?? "";
+    const started = await startAuthorization(client);
 
-    const back = await call(`/callback?state=${state}&code=bad`, {
-      redirect: "manual",
-    });
+    const back = await callback(started, "code=bad");
 
     expect(back.status).toBe(400);
   });
@@ -153,5 +143,24 @@ describe("OAuth sign-in through the Modelfy web", () => {
     expect(oauthOptions.refreshTokenTTL).toBeUndefined();
     expect(oauthOptions.refreshTokenIdleTTL).toBe(90 * 24 * 3600);
     expect(oauthOptions.clientRegistrationTTL).toBeUndefined();
+  });
+
+  it("sets an HttpOnly, SameSite=Lax sign-in cookie at /authorize", async () => {
+    const client = await registerClient();
+    const verifier = await startAuthorization(client);
+
+    expect(verifier.cookie).toMatch(/^__Host-mcp-signin-[\w-]+=1$/);
+  });
+
+  it("a callback from a browser that did not start the sign-in is refused (no code reaches the client)", async () => {
+    const calls = redeemOk();
+    const client = await registerClient();
+    const started = await startAuthorization(client);
+
+    const back = await callback(started, "code=code-1", false);
+
+    expect(back.status).toBe(400);
+    expect(back.headers.get("Location")).toBeNull();
+    expect(calls).toEqual([]);
   });
 });

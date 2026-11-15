@@ -105,6 +105,8 @@ export async function registerClient(
 export interface StartedAuthorization {
   verifier: string;
   location: URL;
+  /** The sign-in cookie /authorize set ("name=value"), sent back at /callback */
+  cookie: string;
 }
 
 /** GET /authorize with PKCE; returns where the Worker redirected. */
@@ -129,7 +131,8 @@ export async function startAuthorization(
   if (location === null) {
     throw new Error(`No redirect from /authorize: ${response.status}`);
   }
-  return { verifier, location: new URL(location) };
+  const cookie = (response.headers.get("Set-Cookie") ?? "").split(";")[0] ?? "";
+  return { verifier, location: new URL(location), cookie };
 }
 
 const AccessToken = z.object({ access_token: z.string() });
@@ -138,13 +141,13 @@ const AccessToken = z.object({ access_token: z.string() });
  * Runs the whole OAuth flow for a client (the API redeem must be answered by
  * the active `mockApi` handler) and returns an access token for /mcp.
  */
-export async function oauthAccessToken(): Promise<string> {
-  const client = await registerClient();
-  const { verifier, location } = await startAuthorization(client);
-  const state = location.searchParams.get("state") ?? "";
-  const back = await call(`/callback?state=${state}&code=code-1`, {
-    redirect: "manual",
-  });
+export async function oauthAccessToken(
+  existing?: RegisteredClient,
+): Promise<string> {
+  const client = existing ?? (await registerClient());
+  const started = await startAuthorization(client);
+  const { verifier } = started;
+  const back = await callback(started, "code=code-1");
   const code =
     new URL(back.headers.get("Location") ?? "").searchParams.get("code") ?? "";
   const response = await call("/oauth/token", {
@@ -174,4 +177,17 @@ export async function connect(token: string): Promise<Client> {
   );
   await client.connect(transport);
   return client;
+}
+
+/** GET /callback for a started sign-in, from the same browser (its cookie). */
+export function callback(
+  started: StartedAuthorization,
+  query: string,
+  withCookie = true,
+): Promise<Response> {
+  const state = started.location.searchParams.get("state") ?? "";
+  return call(`/callback?state=${encodeURIComponent(state)}&${query}`, {
+    redirect: "manual",
+    headers: withCookie ? { Cookie: started.cookie } : {},
+  });
 }
