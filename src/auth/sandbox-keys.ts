@@ -44,17 +44,22 @@ function invalidRequest(description: string): Response {
   );
 }
 
-/** The optional JSON body; no body (or an empty one) means no options. */
+/**
+ * The optional JSON body. Anything that is not a JSON object (no body, a
+ * form, `null`) means no options, as before options existed; an object with
+ * a wrong value is a 400.
+ */
 async function readOptions(
   request: Request,
 ): Promise<z.infer<typeof CreateBodySchema> | Response> {
-  const text = await request.text();
-  if (text.trim() === "") return {};
   let body: unknown;
   try {
-    body = JSON.parse(text);
+    body = JSON.parse(await request.text());
   } catch {
-    return invalidRequest("The body must be JSON.");
+    return {};
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return {};
   }
   const parsed = CreateBodySchema.safeParse(body);
   if (!parsed.success) {

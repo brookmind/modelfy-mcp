@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { env } from "cloudflare:workers";
 import {
   bareLayerAllowed,
+  createSandboxKey,
   sandboxKeysPerHour,
 } from "../../src/auth/sandbox-keys";
 import { call, connect, json, mockApi } from "../helpers/worker";
@@ -323,6 +325,36 @@ describe("sandbox key options", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("agent_layer bare is 400 where the Worker does not allow it", async () => {
+    const response = await createSandboxKey(
+      new Request("https://mcp.test/sandbox/keys", {
+        method: "POST",
+        headers: {
+          "CF-Connecting-IP": "203.0.113.24",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ agent_layer: "bare" }),
+      }),
+      { ...env, ALLOW_BARE_AGENT_LAYER: "false" },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_request" });
+  });
+
+  it.each(["x=1", "null", "[]", "not json"])(
+    "a body that is not a JSON object (%s) is ignored, as before",
+    async (body) => {
+      const response = await call("/sandbox/keys", {
+        method: "POST",
+        headers: { "CF-Connecting-IP": "203.0.113.25" },
+        body,
+      });
+
+      expect(response.status).toBe(200);
+    },
+  );
 
   it("bare is allowed only when ALLOW_BARE_AGENT_LAYER is true", () => {
     expect(bareLayerAllowed("true")).toBe(true);

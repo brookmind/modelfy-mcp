@@ -156,7 +156,11 @@ export class SandboxBackend implements PhotoBackend {
     return Number.isFinite(spent) ? spent : 0;
   }
 
-  /** Refuses a launch over the budget, as the Modelfy API does for live keys. */
+  /**
+   * Refuses a launch over the budget, as the Modelfy API does for live keys.
+   * Approximate: KV has no atomic increment, so launches fired at the same
+   * moment can each pass the daily check (the API reserves atomically).
+   */
   async #spend(credits: number): Promise<void> {
     const budget = await this.#budget();
     if (budget === null) return;

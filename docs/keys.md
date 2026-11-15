@@ -54,6 +54,8 @@ curl -X POST https://mcp.modelfy.ai/sandbox/keys \
 | `"person"` | an OAuth connection in a chat      | `generate_photos` needs `user_confirmed: true` after the person's yes, or returns `CONFIRMATION_REQUIRED`                                            |
 | `"bot"`    | a live key with the default budget | 100 credits per photo session and 500 per UTC day (20 credits per photo); a launch over it returns `BUDGET_EXCEEDED`; `get_account` shows the budget |
 
+The sandbox's daily budget is approximate when several launches start at the same moment; the real budget of a live key is exact.
+
 ### A demo product
 
 `https://mcp.modelfy.ai/sandbox/demo/product` is a small product page (a linen T-shirt with two photos) to try "make photos of this product" without a store of your own. Its image links work with `add_product_photos`; the page itself is not an image and comes back as rejected, like any web page.
