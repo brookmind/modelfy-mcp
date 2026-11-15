@@ -6,6 +6,7 @@ import { ApiBackend } from "./api-backend";
 import { safeImageFetch } from "./download";
 import { previewBody } from "./plan-body";
 import {
+  demoImage,
   SANDBOX_BACKGROUNDS,
   SANDBOX_MODELS,
   SANDBOX_OPTIONS,
@@ -223,7 +224,17 @@ export class SandboxBackend implements PhotoBackend {
 
   async addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
     const added: AddedPhoto[] = [];
+    const demo = `${this.#env.PUBLIC_URL}/sandbox/demo/`;
     for (const url of urls) {
+      // A Worker may not fetch its own domain: the demo is resolved here
+      if (url.startsWith(demo)) {
+        added.push(
+          demoImage(url.slice(demo.length)) === null
+            ? { source_url: url, error: `${url}: not an image` }
+            : { source_url: url, upload_id: `sbx_${randomBase64Url(12)}` },
+        );
+        continue;
+      }
       try {
         await safeImageFetch(url);
         added.push({

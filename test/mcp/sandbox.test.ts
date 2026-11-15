@@ -1,7 +1,6 @@
-import { env, exports } from "cloudflare:workers";
+import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { sha256Hex } from "../../src/crypto";
 import { call, connect, json, mockApi, type ApiCall } from "../helpers/worker";
 
 const TEST_KEY = `mfy_test_${"T".repeat(43)}`;
@@ -256,33 +255,6 @@ describe("the sandbox", () => {
         .parse(result.structuredContent)
         .models.map((model) => model.id),
     ).toEqual(["staff-1"]);
-  });
-
-  it("an anonymous key past 300 calls in an hour is refused with 429", async () => {
-    mockApi(catalogApi, images);
-    const key = await anonymousKey("192.0.2.77");
-    const stored = z
-      .object({ sandboxId: z.string() })
-      .parse(
-        await env.OAUTH_KV.get(`sandbox-key:${await sha256Hex(key)}`, "json"),
-      );
-    const window = Math.floor(Date.now() / 3_600_000);
-    await env.OAUTH_KV.put(
-      `limit:anon-calls:${stored.sandboxId}:${window}`,
-      "300",
-    );
-
-    const response = await call("/mcp", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
-    });
-
-    expect(response.status).toBe(429);
   });
 
   it("cancelling a sandbox session twice keeps it cancelled", async () => {

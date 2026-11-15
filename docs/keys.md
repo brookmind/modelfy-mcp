@@ -37,7 +37,26 @@ curl -X POST https://mcp.modelfy.ai/sandbox/keys
 { "api_key": "mfy_test_…", "expires_at": "2026-12-15T10:00:00.000Z" }
 ```
 
-A free key with no account, valid for 30 days. Every tool works: the catalog is real, everything else is canned, the photos are samples marked SANDBOX, and nothing is spent. Limits: 5 keys per hour per address, 300 calls per hour per key.
+A free key with no account, valid for 30 days. Every tool works: the catalog is real, everything else is canned, the photos are samples marked SANDBOX, and nothing is spent. Limits: 5 keys per hour per address, 60 calls per minute per key.
+
+### Try the spending rules
+
+By default a sandbox key launches without asking anyone. To try the flow your agent will really have, ask for a key that spends like one:
+
+```sh
+curl -X POST https://mcp.modelfy.ai/sandbox/keys \
+  -H "Content-Type: application/json" \
+  -d '{"acts_as": "person"}'
+```
+
+| `acts_as`  | Behaves like                       | What changes                                                                                                                                         |
+| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"person"` | an OAuth connection in a chat      | `generate_photos` needs `user_confirmed: true` after the person's yes, or returns `CONFIRMATION_REQUIRED`                                            |
+| `"bot"`    | a live key with the default budget | 100 credits per photo session and 500 per UTC day (20 credits per photo); a launch over it returns `BUDGET_EXCEEDED`; `get_account` shows the budget |
+
+### A demo product
+
+`https://mcp.modelfy.ai/sandbox/demo/product` is a small product page (a linen T-shirt with two photos) to try "make photos of this product" without a store of your own. Its image links work with `add_product_photos`; the page itself is not an image and comes back as rejected, like any web page.
 
 ## Device login
 
