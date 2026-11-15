@@ -1,0 +1,238 @@
+import {
+  authorizationErrorRedirect,
+  type AuthRequest,
+} from "@cloudflare/workers-oauth-provider";
+import { z } from "zod";
+import { ApiFailure, ModelfyApi } from "../api/client";
+import { randomBase64Url, sha256Hex } from "../crypto";
+import type { AppEnv } from "../env";
+import type { GrantProps } from "./props";
+
+const AUTH_REQUEST_TTL_SECONDS = 600;
+const MAX_CLIENT_NAME = 60;
+const DEFAULT_CLIENT_NAME = "An AI assistant";
+
+const StoredAuthRequestSchema = z.object({
+  request: z.object({
+    responseType: z.string(),
+    clientId: z.string(),
+    redirectUri: z.string(),
+    scope: z.array(z.string()),
+    state: z.string(),
+    codeChallenge: z.string().optional(),
+    codeChallengeMethod: z.string().optional(),
+    resource: z.string().optional(),
+    issuer: z.string().optional(),
+  }),
+  clientName: z.string(),
+});
+type StoredAuthRequest = z.infer<typeof StoredAuthRequestSchema>;
+
+const RedeemedSchema = z.object({ userId: z.string(), token: z.string() });
+
+/** One cookie per sign-in, so two sign-ins at once in a browser both work. */
+async function signInCookieName(state: string): Promise<string> {
+  return `__Host-mcp-signin-${(await sha256Hex(state)).slice(0, 24)}`;
+}
+
+function hasCookie(request: Request, name: string): boolean {
+  const header = request.headers.get("Cookie") ?? "";
+  return header
+    .split(";")
+    .some(
+      (part) =>
+        part.trim().startsWith(`${name}=`) && part.trim() !== `${name}=`,
+    );
+}
+
+function redirectWithCookie(location: string, cookie: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: location, "Set-Cookie": cookie },
+  });
+}
+
+function authRequestKey(state: string): string {
+  return `auth-request:${state}`;
+}
+
+function page(status: number, title: string, body: string): Response {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body style="font-family:system-ui,sans-serif;background:#000;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0"><main style="max-width:28rem;padding:2rem;text-align:center"><h1 style="font-weight:500">${title}</h1><p style="color:#a1a1a1">${body}</p></main></body></html>`;
+  return new Response(html, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+async function readAuthRequest(
+  env: AppEnv,
+  state: string,
+): Promise<StoredAuthRequest | null> {
+  const stored = await env.OAUTH_KV.get(authRequestKey(state), "json");
+  const parsed = StoredAuthRequestSchema.safeParse(stored);
+  return parsed.success ? parsed.data : null;
+}
+
+function toAuthRequest(stored: StoredAuthRequest["request"]): AuthRequest {
+  return {
+    responseType: stored.responseType,
+    clientId: stored.clientId,
+    redirectUri: stored.redirectUri,
+    scope: stored.scope,
+    state: stored.state,
+    ...(stored.codeChallenge !== undefined
+      ? { codeChallenge: stored.codeChallenge }
+      : {}),
+    ...(stored.codeChallengeMethod !== undefined
+      ? { codeChallengeMethod: stored.codeChallengeMethod }
+      : {}),
+    ...(stored.resource !== undefined ? { resource: stored.resource } : {}),
+    ...(stored.issuer !== undefined ? { issuer: stored.issuer } : {}),
+  };
+}
+
+/**
+ * GET /authorize: the request is validated by the provider, kept under a
+ * fresh `state`, and the person is sent to the Modelfy web to sign in and
+ * consent (design §4.2 steps 2–3).
+ */
+export async function authorize(
+  request: Request,
+  env: AppEnv,
+): Promise<Response> {
+  let authRequest: AuthRequest;
+  try {
+    authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
+  } catch {
+    return page(
+      400,
+      "This sign-in link is not valid",
+      "Start again from your assistant.",
+    );
+  }
+  const client = await env.OAUTH_PROVIDER.lookupClient(authRequest.clientId);
+  const clientName = (client?.clientName?.trim() || DEFAULT_CLIENT_NAME).slice(
+    0,
+    MAX_CLIENT_NAME,
+  );
+  const state = randomBase64Url(32);
+  const stored: StoredAuthRequest = { request: authRequest, clientName };
+  await env.OAUTH_KV.put(authRequestKey(state), JSON.stringify(stored), {
+    expirationTtl: AUTH_REQUEST_TTL_SECONDS,
+  });
+  const consent = new URL("/connect", env.WEB_URL);
+  consent.searchParams.set("state", state);
+  consent.searchParams.set("client_id", authRequest.clientId);
+  consent.searchParams.set("client_name", clientName);
+  // The sign-in belongs to this browser: /callback requires this cookie, so a
+  // consent link sent to someone else cannot complete an attacker's request
+  return redirectWithCookie(
+    consent.toString(),
+    `${await signInCookieName(state)}=1; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${AUTH_REQUEST_TTL_SECONDS}`,
+  );
+}
+
+/**
+ * GET /callback?state&code (or &error=access_denied): the web's answer. The
+ * code is exchanged with the API for the user's token, which becomes the
+ * grant's props; the client gets its authorization code.
+ */
+export async function callback(
+  request: Request,
+  env: AppEnv,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const state = url.searchParams.get("state") ?? "";
+  const cookieName = await signInCookieName(state);
+  if (!hasCookie(request, cookieName)) {
+    return page(
+      400,
+      "Finish signing in where you started",
+      "Open the link from your assistant again, in this browser.",
+    );
+  }
+  const stored = await readAuthRequest(env, state);
+  if (stored === null) {
+    return page(
+      400,
+      "This sign-in has expired",
+      "Start again from your assistant.",
+    );
+  }
+  // One use only, whatever happens next
+  await env.OAUTH_KV.delete(authRequestKey(state));
+  const authRequest = toAuthRequest(stored.request);
+  const clearCookie = `${cookieName}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`;
+
+  if (url.searchParams.get("error") === "access_denied") {
+    return redirectWithCookie(
+      authorizationErrorRedirect(authRequest, "access_denied"),
+      clearCookie,
+    );
+  }
+
+  const code = url.searchParams.get("code") ?? "";
+  let redeemed: z.infer<typeof RedeemedSchema>;
+  try {
+    redeemed = await new ModelfyApi(env, null).post(
+      "/v2/connections/codes/redeem",
+      { code, state },
+      RedeemedSchema,
+    );
+  } catch (error) {
+    if (error instanceof ApiFailure) {
+      return page(
+        400,
+        "Modelfy could not finish the sign-in",
+        "Start again from your assistant.",
+      );
+    }
+    throw error;
+  }
+
+  const props: GrantProps = {
+    kind: "oauth",
+    userId: redeemed.userId,
+    apiToken: redeemed.token,
+    sandboxId: null,
+    budget: null,
+  };
+  const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+    request: authRequest,
+    userId: redeemed.userId,
+    metadata: { clientName: stored.clientName },
+    scope: authRequest.scope,
+    props,
+    // Devices sharing a client id (claude.ai and Desktop) keep their own grants
+    revokeExistingGrants: false,
+  });
+  return redirectWithCookie(redirectTo, clearCookie);
+}
+
+/**
+ * GET /authorize/request?state: the pending request as the server knows it,
+ * so the consent page shows the registered client and where it sends the
+ * person back, never a name taken from the link.
+ */
+export async function pendingRequest(
+  request: Request,
+  env: AppEnv,
+): Promise<Response> {
+  const state = new URL(request.url).searchParams.get("state") ?? "";
+  const stored = await readAuthRequest(env, state);
+  const headers = new Headers({
+    "Access-Control-Allow-Origin": new URL(env.WEB_URL).origin,
+    Vary: "Origin",
+  });
+  if (stored === null) {
+    return Response.json({ error: "NOT_FOUND" }, { status: 404, headers });
+  }
+  return Response.json(
+    {
+      clientName: stored.clientName,
+      clientId: stored.request.clientId,
+      redirectHost: new URL(stored.request.redirectUri).host,
+    },
+    { headers },
+  );
+}
