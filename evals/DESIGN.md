@@ -172,9 +172,10 @@ Workers runtime): `@anthropic-ai/sdk`, `@anthropic-ai/claude-agent-sdk`,
   goes through one queue, because each refresh replaces the refresh token.
 - The sandbox mounts only the code the agent's process runs (`src`,
   `node_modules`, `package.json`, `tsconfig.json`): never `.secrets` (the dev
-  session), `runs` (other runs' keys and answers) or `results`. Known limit:
-  the network is shared with the host, so local services on 127.0.0.1 are
-  reachable from the sandbox.
+  session), `runs` (other runs' keys and answers) or `results`. Its network
+  is its own namespace, connected to the internet by slirp4netns with the
+  host's loopback disabled: local services (agentmemory, dev servers) are out
+  of reach. If that network fails, the run is a harness error, not graded.
 - Server under test: mcp-dev, or a pinned local copy of the Worker
   (`wrangler dev` of one commit behind a Cloudflare quick tunnel,
   `EVALS_BASE_URL`), which has no KV write limit and does not change when

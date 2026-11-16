@@ -1,5 +1,6 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
+import { Readable, Writable } from "node:stream";
 import { z } from "zod";
 import { savedKey } from "../env-file.ts";
 import { TraceEventSchema, type Trace, type TraceEvent } from "../trace.ts";
@@ -61,9 +62,8 @@ export interface SandboxPaths {
 /** The parts of the evals package the agent's process needs to run. */
 const HARNESS_PARTS = ["src", "node_modules", "package.json", "tsconfig.json"];
 
-/** From /etc, only what DNS, TLS and user lookups need. */
+/** From /etc, only what TLS and user lookups need (DNS: sandbox/resolv.conf). */
 const ETC_FILES = [
-  "/etc/resolv.conf",
   "/etc/hosts",
   "/etc/nsswitch.conf",
   "/etc/passwd",
@@ -75,8 +75,11 @@ const ETC_FILES = [
 
 /**
  * The coding agent runs shell commands, so it runs in bubblewrap: system
- * folders read-only, an empty home, only the run folder writable, network on.
- * The host's home (tokens, configs) and the rest of /etc are never mounted.
+ * folders read-only, an empty home, only the run folder writable. The host's
+ * home (tokens, configs) and the rest of /etc are never mounted. It gets its
+ * own network namespace, which slirp4netns connects to the internet without
+ * the host's loopback (see spawnSandboxed): fd 3 reports the namespace's pid
+ * and the command waits on fd 4 until the network is up.
  */
 export function bwrapArgs(paths: SandboxPaths): string[] {
   return [
@@ -84,6 +87,9 @@ export function bwrapArgs(paths: SandboxPaths): string[] {
     "/usr",
     "/usr",
     ...ETC_FILES.flatMap((path) => ["--ro-bind-try", path, path]),
+    "--ro-bind",
+    `${paths.harness}/sandbox/resolv.conf`,
+    "/etc/resolv.conf",
     "--symlink",
     "usr/lib",
     "/lib",
@@ -117,11 +123,106 @@ export function bwrapArgs(paths: SandboxPaths): string[] {
     "--proc",
     "/proc",
     "--unshare-all",
-    "--share-net",
     "--die-with-parent",
+    "--info-fd",
+    "3",
+    "--block-fd",
+    "4",
     "--chdir",
     "/work",
   ];
+}
+
+const BwrapInfo = z.object({ "child-pid": z.number().int().positive() });
+
+export interface SandboxProcess {
+  /** stdin, stdout and stderr are pipes */
+  child: ChildProcess;
+  /**
+   * Why the sandbox's network failed, if it did: then the run measured the
+   * harness, not the agent, and must not be graded.
+   */
+  networkError(): string | null;
+}
+
+/**
+ * Starts a command in the sandbox and connects its network: once bwrap
+ * reports the namespace's pid, slirp4netns gives it internet access (with
+ * the host's loopback disabled), then the command is released. If the
+ * network fails, the command is stopped and networkError() says why.
+ */
+export function spawnSandboxed(
+  paths: SandboxPaths,
+  command: string[],
+  env: NodeJS.ProcessEnv,
+): SandboxProcess {
+  const child = spawn("bwrap", [...bwrapArgs(paths), ...command], {
+    stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
+    env,
+  });
+  const info = child.stdio[3];
+  const release = child.stdio[4];
+  if (!(info instanceof Readable) || !(release instanceof Writable)) {
+    child.kill("SIGKILL");
+    throw new Error("bwrap's info and block pipes are missing");
+  }
+  let failure: string | null = null;
+  let finished = false;
+  const fail = (reason: string): void => {
+    failure ??= reason;
+    child.kill("SIGKILL");
+  };
+  let text = "";
+  let network: ChildProcess | null = null;
+  info.on("data", (chunk: Buffer) => {
+    text += chunk.toString();
+    if (network !== null) return;
+    let pid: number;
+    try {
+      pid = BwrapInfo.parse(JSON.parse(text))["child-pid"];
+    } catch {
+      return; // Not the whole JSON yet
+    }
+    network = spawn(
+      "slirp4netns",
+      [
+        "--configure",
+        "--mtu=65520",
+        "--disable-host-loopback",
+        "--ready-fd",
+        "3",
+        String(pid),
+        "tap0",
+      ],
+      { stdio: ["ignore", "ignore", "pipe", "pipe"] },
+    );
+    let log = "";
+    network.stderr?.on("data", (data: Buffer) => {
+      log = (log + data.toString()).slice(-500);
+    });
+    const ready = network.stdio[3];
+    if (!(ready instanceof Readable)) {
+      fail("slirp4netns has no ready pipe");
+      return;
+    }
+    ready.once("data", () => {
+      release.end("1");
+    });
+    network.on("error", (error) => {
+      fail(`slirp4netns could not start: ${error.message}`);
+    });
+    network.on("exit", (code, signal) => {
+      // The network went away while the command still needed it
+      if (!finished) {
+        fail(`slirp4netns stopped (${String(code ?? signal)}): ${log.trim()}`);
+      }
+    });
+  });
+  child.on("exit", () => {
+    finished = true;
+    network?.kill();
+  });
+  return { child, networkError: () => failure };
 }
 
 /**
@@ -166,23 +267,28 @@ export async function runCoder(
     stopReason: "",
   };
   trace.events.push({ kind: "person_text", text: prompt, at: 0 });
-  const child = spawn(
-    "bwrap",
+  const sandbox = spawnSandboxed(
+    paths,
     [
-      ...bwrapArgs(paths),
       "/usr/bin/node",
       "/harness/node_modules/tsx/dist/cli.mjs",
       "/harness/src/agents/coder-child.ts",
       prompt,
     ],
-    { stdio: ["pipe", "pipe", "pipe"], env: sandboxEnv(anthropicKey) },
+    sandboxEnv(anthropicKey),
   );
+  const { child } = sandbox;
+  const { stdin, stdout, stderr: errors } = child;
+  if (stdin === null || stdout === null || errors === null) {
+    child.kill("SIGKILL");
+    throw new Error("The sandboxed agent has no stdio pipes");
+  }
   const timer = setTimeout(() => {
     trace.stopReason = "timeout";
     child.kill("SIGKILL");
   }, RUN_TIMEOUT_MS);
   let stderr = "";
-  child.stderr.on("data", (chunk: Buffer) => {
+  errors.on("data", (chunk: Buffer) => {
     stderr = (stderr + chunk.toString()).slice(-4000);
   });
 
@@ -190,7 +296,7 @@ export async function runCoder(
   const tried = new Set<string>();
   // An approval the agent has not been told about yet
   let untold = false;
-  for await (const line of createInterface({ input: child.stdout })) {
+  for await (const line of createInterface({ input: stdout })) {
     let parsed: z.infer<typeof EventSchema>;
     try {
       parsed = EventSchema.parse(JSON.parse(line));
@@ -205,7 +311,7 @@ export async function runCoder(
         keySaved: (await savedKey(paths.runDir)) !== null,
       });
       untold = false;
-      child.stdin.write(tell ? `continue ${APPROVED_MESSAGE}\n` : "stop\n");
+      stdin.write(tell ? `continue ${APPROVED_MESSAGE}\n` : "stop\n");
       continue;
     }
     const event: TraceEvent = parsed;
@@ -226,6 +332,9 @@ export async function runCoder(
     }
   }
   clearTimeout(timer);
+  const networkError = sandbox.networkError();
+  // The harness failed, not the agent: no grade; the runner retries it later
+  if (networkError !== null) throw new Error(networkError);
   if (trace.stopReason === "" && stderr !== "")
     trace.stopReason = `crashed: ${stderr.slice(-300)}`;
   trace.endedAt = Date.now();

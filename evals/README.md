@@ -32,6 +32,7 @@ npm run report -- baseline-bare baseline-v0
 ### Suite B needs
 
 - `bwrap` (bubblewrap) that can create user namespaces. On Ubuntu 24.04 that needs an AppArmor profile for `/usr/bin/bwrap` with `userns,` (the default restricts it).
+- `slirp4netns` (`apt install slirp4netns`): the sandbox's own network, internet only, without the host's loopback.
 - For `device-login`: the refresh token of a dev test account in `.secrets/dev-refresh-token` (mode 600, outside git). The harness plays the person: it approves the device code with a **test** key and revokes that key after the run.
 
 ## The dev Worker's KV budget

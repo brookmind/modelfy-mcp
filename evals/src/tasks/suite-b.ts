@@ -1,13 +1,10 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { bwrapArgs, type SandboxPaths } from "../agents/coder.ts";
+import { spawnSandboxed, type SandboxPaths } from "../agents/coder.ts";
 import { BASE_URL } from "../config.ts";
 import { savedKey } from "../env-file.ts";
 import { keyWorks, recentPhotoCount } from "../mcp-check.ts";
 import type { Trace } from "../trace.ts";
 import type { Grade } from "./types.ts";
 
-const run = promisify(execFile);
 const SCRIPT_TIMEOUT_MS = 180_000;
 
 export interface CodeTask {
@@ -63,23 +60,28 @@ async function scriptRuns(
   paths: SandboxPaths,
   key: string,
 ): Promise<string | null> {
-  try {
-    await run(
-      "bwrap",
-      [...bwrapArgs(paths), "/usr/bin/node", "make-photos.mjs"],
-      {
-        timeout: SCRIPT_TIMEOUT_MS,
-        env: {
-          MODELFY_API_KEY: key,
-          HOME: "/home/agent",
-          PATH: "/usr/local/bin:/usr/bin:/bin",
-        },
-      },
-    );
-    return null;
-  } catch (error) {
-    return error instanceof Error ? error.message.slice(0, 300) : "failed";
-  }
+  // The same sandbox and network as the agent had: the script is its code
+  const sandbox = spawnSandboxed(paths, ["/usr/bin/node", "make-photos.mjs"], {
+    MODELFY_API_KEY: key,
+    HOME: "/home/agent",
+    PATH: "/usr/local/bin:/usr/bin:/bin",
+  });
+  const { child } = sandbox;
+  child.stdin?.end();
+  child.stdout?.resume();
+  let stderr = "";
+  child.stderr?.on("data", (chunk: Buffer) => {
+    stderr = (stderr + chunk.toString()).slice(-300);
+  });
+  const timer = setTimeout(() => child.kill("SIGKILL"), SCRIPT_TIMEOUT_MS);
+  const code = await new Promise<number | null>((resolve) => {
+    child.on("exit", resolve);
+  });
+  clearTimeout(timer);
+  // A sandbox without network says nothing about the agent's script
+  const networkError = sandbox.networkError();
+  if (networkError !== null) throw new Error(networkError);
+  return code === 0 ? null : `exit ${String(code)}: ${stderr.trim()}`;
 }
 
 export async function checkCodeTask(

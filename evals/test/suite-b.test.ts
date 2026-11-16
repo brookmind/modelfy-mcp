@@ -212,10 +212,27 @@ describe("the sandbox around the coding agent", () => {
       bound.filter((path) => path === home || path.startsWith(`${home}/`)),
     ).toEqual([]);
     expect(args.join(" ")).not.toContain("--ro-bind /etc /etc");
-    expect(args.join(" ")).toContain("/etc/resolv.conf");
-    expect(args).toContain("--unshare-all");
-    expect(args).toContain("--share-net");
     expect(args.join(" ")).toContain(`--bind ${runDir} /work`);
+  });
+
+  it("gives the sandbox its own network, never the host's", () => {
+    const args = bwrapArgs({
+      harness: "/srv/evals",
+      runDir: "/srv/evals/runs/abc",
+    });
+
+    // Its own network namespace, which slirp4netns connects to the internet
+    // without the host's loopback (agentmemory, local dev servers)
+    expect(args).toContain("--unshare-all");
+    expect(args).not.toContain("--share-net");
+    // The namespace's pid goes to fd 3; the command waits on fd 4 until the
+    // network is up
+    expect(args.join(" ")).toContain("--info-fd 3 --block-fd 4");
+    // DNS through slirp4netns, not the host's resolver
+    expect(args.join(" ")).toMatch(
+      /--ro-bind \S+resolv\.conf \/etc\/resolv\.conf/,
+    );
+    expect(args.join(" ")).not.toContain("--ro-bind-try /etc/resolv.conf");
   });
 
   it("mounts only the code the agent runs, never secrets, runs or results", () => {
