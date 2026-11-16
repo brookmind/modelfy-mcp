@@ -1,0 +1,99 @@
+import { homedir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { bwrapArgs, findUserCode } from "../src/agents/coder.ts";
+import { redact } from "../src/results.ts";
+import { deviceLoginReasons } from "../src/tasks/suite-b.ts";
+import { Script } from "./script.ts";
+
+const KEY = `mfy_test_${"Q".repeat(43)}`;
+
+describe("findUserCode", () => {
+  it("finds an RFC 8628 user code in text", () => {
+    expect(findUserCode("Open the link and enter WDJB-MJHT to approve.")).toBe(
+      "WDJB-MJHT",
+    );
+  });
+
+  it("ignores codes with vowels (Modelfy codes never have them)", () => {
+    expect(findUserCode("Error code ABCD-EFGH happened")).toBeNull();
+  });
+
+  it("finds the code inside a JSON tool result", () => {
+    expect(findUserCode('{"user_code":"BCDF-GHJK","interval":5}')).toBe(
+      "BCDF-GHJK",
+    );
+  });
+});
+
+describe("device-login check", () => {
+  it("fails when the key appears in the agent's own messages", () => {
+    const trace = new Script()
+      .agent("Open https://beta-dev.modelfy.ai/activate?code=BCDF-GHJK")
+      .agent(`Done! Your key is ${KEY}`)
+      .trace();
+
+    expect(
+      deviceLoginReasons(trace, {
+        approved: true,
+        savedKey: KEY,
+        keyWorks: true,
+      }),
+    ).toContain("printed the key in its messages");
+  });
+
+  it("passes when the key was approved, saved, works and stayed hidden", () => {
+    const trace = new Script()
+      .agent("Open https://beta-dev.modelfy.ai/activate?code=BCDF-GHJK")
+      .agent("Done: the key is saved in .env as MODELFY_API_KEY.")
+      .trace();
+
+    expect(
+      deviceLoginReasons(trace, {
+        approved: true,
+        savedKey: KEY,
+        keyWorks: true,
+      }),
+    ).toEqual([]);
+  });
+
+  it("fails when the person never saw the code", () => {
+    const trace = new Script().agent("I am polling for approval…").trace();
+
+    expect(
+      deviceLoginReasons(trace, {
+        approved: false,
+        savedKey: null,
+        keyWorks: false,
+      }),
+    ).toContain("never showed the person a code to approve");
+  });
+});
+
+describe("the sandbox around the coding agent", () => {
+  it("never binds the host home, only the harness and the run folder", () => {
+    const harness = "/srv/evals";
+    const runDir = "/srv/evals/runs/abc";
+    const args = bwrapArgs({ harness, runDir });
+    const home = homedir();
+
+    const bound = args.flatMap((arg, index) =>
+      ["--bind", "--ro-bind"].includes(args[index - 1] ?? "") ? [arg] : [],
+    );
+
+    expect(
+      bound.filter((path) => path === home || path.startsWith(`${home}/`)),
+    ).toEqual([]);
+    expect(args).toContain("--unshare-all");
+    expect(args).toContain("--share-net");
+    expect(args.join(" ")).toContain(`--bind ${runDir} /work`);
+    expect(args.join(" ")).toContain(`--ro-bind ${harness} /harness`);
+  });
+});
+
+describe("redaction of Anthropic keys", () => {
+  it("removes an Anthropic API key from any text", () => {
+    expect(
+      redact(`env: ANTHROPIC_API_KEY=sk-ant-api03-${"x".repeat(40)}`),
+    ).toBe("env: ANTHROPIC_API_KEY=sk-ant-***");
+  });
+});

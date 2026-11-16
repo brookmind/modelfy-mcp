@@ -5,8 +5,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { randomUUID } from "node:crypto";
 import { runChat } from "./agents/chat.ts";
-import { KV_WRITES_PER_DAY } from "./config.ts";
+import { runCoder } from "./agents/coder.ts";
+import { DEMO, KV_WRITES_PER_DAY } from "./config.ts";
+import { approveDevice, revokeKeyNamed } from "./device-approver.ts";
+import { checkCodeTask, SUITE_B } from "./tasks/suite-b.ts";
 import { makeJudge } from "./grade/judge.ts";
 import {
   appendRow,
@@ -31,7 +35,13 @@ export interface Job {
   run(
     client: Anthropic,
     arm: AgentLayer,
-  ): Promise<{ trace: Trace; grade: Grade; extraUsages: Usage[] }>;
+  ): Promise<{
+    trace: Trace;
+    grade: Grade;
+    extraUsages: Usage[];
+    /** Overrides the trace-based KV estimate (the coding agent's runs) */
+    kvWrites?: number;
+  }>;
 }
 
 const SUITE_A_JOBS: Job[] = SUITE_A.map((task) => ({
@@ -49,8 +59,44 @@ const SUITE_A_JOBS: Job[] = SUITE_A.map((task) => ({
   },
 }));
 
-/** Suite B jobs are added by agents/coder.ts (Task 9). */
-export const JOBS: Job[] = [...SUITE_A_JOBS];
+/** A rough KV estimate for a coding-agent run (its script calls the server). */
+const SUITE_B_KV_WRITES = 15;
+
+const SUITE_B_JOBS: Job[] = SUITE_B.map((task) => ({
+  task: task.id,
+  suite: "b",
+  async run() {
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey === undefined || anthropicKey === "") {
+      throw new Error("ANTHROPIC_API_KEY is not set");
+    }
+    const runDir = join(EVALS_DIR, "runs", `${task.id}-${randomUUID()}`);
+    await mkdir(runDir, { recursive: true });
+    if (task.id === "node-script") {
+      const image = await fetch(DEMO.front);
+      await writeFile(
+        join(runDir, "tee.png"),
+        new Uint8Array(await image.arrayBuffer()),
+      );
+    }
+    const keyName = `eval device login ${randomUUID().slice(0, 8)}`;
+    const paths = { harness: EVALS_DIR, runDir };
+    const { trace, approvedCode } = await runCoder(
+      task.prompt,
+      paths,
+      anthropicKey,
+      (code) => approveDevice(code, keyName),
+    );
+    try {
+      const grade = await checkCodeTask(task, trace, paths, approvedCode);
+      return { trace, grade, extraUsages: [], kvWrites: SUITE_B_KV_WRITES };
+    } finally {
+      if (approvedCode !== null) await revokeKeyNamed(keyName);
+    }
+  },
+}));
+
+export const JOBS: Job[] = [...SUITE_A_JOBS, ...SUITE_B_JOBS];
 
 function tallyPath(now: Date = new Date()): string {
   return join(
@@ -142,8 +188,12 @@ async function main(): Promise<void> {
       }
       const { job, rep } = next;
       try {
-        const { trace, grade, extraUsages } = await job.run(client, arm);
+        const { trace, grade, extraUsages, kvWrites } = await job.run(
+          client,
+          arm,
+        );
         const metrics = metricsOf(trace, extraUsages);
+        if (kvWrites !== undefined) metrics.kvWrites = kvWrites;
         await addKvWrites(metrics.kvWrites);
         const row: ResultRow = {
           runId,

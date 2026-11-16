@@ -45,10 +45,14 @@ export interface ResultRow {
 }
 
 const KEY_PATTERN = /mfy_(test|live)_[0-9A-Za-z]{20,}/g;
+/** The coding agent can read its own environment: never keep that key */
+const ANTHROPIC_KEY_PATTERN = /sk-ant-[0-9A-Za-z_-]{20,}/g;
 
-/** Sandbox and live keys never reach a result file. */
+/** Modelfy keys and the Anthropic key never reach a result file. */
 export function redact(text: string): string {
-  return text.replace(KEY_PATTERN, "mfy_$1_***");
+  return text
+    .replace(KEY_PATTERN, "mfy_$1_***")
+    .replace(ANTHROPIC_KEY_PATTERN, "sk-ant-***");
 }
 
 export function rowKey(task: string, arm: AgentLayer, rep: number): string {
