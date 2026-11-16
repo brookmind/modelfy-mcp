@@ -123,6 +123,7 @@ const SessionOutput = z.object({
     z.object({
       photo_id: z.string(),
       url: z.string(),
+      preview_url: z.string().nullable(),
       product: z.string().nullable(),
     }),
   ),
@@ -145,12 +146,20 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Up to 4 finished photos as image content, so the chat can show them. */
+/**
+ * Up to 4 finished photos as image content, so the chat can show them: the
+ * small preview when Modelfy has one, since a full photo is rarely under 1 MB.
+ */
 async function imageContent(
   status: SessionStatus,
 ): Promise<CallToolResult["content"]> {
   const images = await Promise.all(
-    status.photos.slice(0, MAX_IMAGES).map((photo) => smallImage(photo.url)),
+    status.photos.slice(0, MAX_IMAGES).map(async (photo) => {
+      const preview =
+        photo.preview_url !== null ? await smallImage(photo.preview_url) : [];
+      // No preview, or one that cannot be shown: the photo itself, if small
+      return preview.length > 0 ? preview : smallImage(photo.url);
+    }),
   );
   return images.flat();
 }

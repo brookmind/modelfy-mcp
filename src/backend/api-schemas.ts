@@ -129,7 +129,14 @@ export const ShootDetailSchema = z.object({
     z.object({
       itemId: z.string(),
       status: z.string(),
-      media: z.object({ id: z.string(), url: z.string() }).nullable(),
+      media: z
+        .object({
+          id: z.string(),
+          url: z.string(),
+          // A small JPEG of the photo; absent or null when the API has none
+          previewUrl: z.string().nullish(),
+        })
+        .nullable(),
     }),
   ),
 });

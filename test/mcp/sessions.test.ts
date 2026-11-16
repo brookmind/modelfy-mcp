@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { ShootDetailSchema } from "../../src/backend/api-schemas";
+import { toSessionStatus } from "../../src/backend/session-status";
 import {
   connect,
   json,
@@ -67,7 +69,11 @@ function detail(status: string, succeeded: number): unknown {
         credits: 20,
         media:
           i < succeeded
-            ? { id: `media-${i}`, url: `https://cdn.test/photo-${i}.jpg` }
+            ? {
+                id: `media-${i}`,
+                url: `https://cdn.test/photo-${i}.jpg`,
+                previewUrl: `https://cdn.test/cdn-cgi/image/width=1024/photo-${i}.jpg`,
+              }
             : null,
       })),
       createdAt: "2026-11-15T10:00:00.000Z",
@@ -499,6 +505,91 @@ describe("plan, generate and follow photo sessions", () => {
         .parse(result.content)
         .filter((part) => part.type === "image"),
     ).toHaveLength(0);
+  });
+
+  it("the images shown come from the small previews, not the full photos", async () => {
+    const fetched: string[] = [];
+    mockApi(sessionsApi(), (request) => {
+      fetched.push(request.url);
+      return cdn();
+    });
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "get_photo_session",
+      arguments: { session_id: "shoot-1" },
+    });
+
+    expect(fetched.length).toBeGreaterThan(0);
+    expect(fetched.every((url) => url.includes("/cdn-cgi/image/"))).toBe(true);
+    expect(
+      z
+        .object({
+          photos: z.array(
+            z.object({ url: z.string(), preview_url: z.string() }),
+          ),
+        })
+        .parse(result.structuredContent).photos[0],
+    ).toEqual({
+      url: "https://cdn.test/photo-0.jpg",
+      preview_url: "https://cdn.test/cdn-cgi/image/width=1024/photo-0.jpg",
+    });
+  });
+
+  it.each([
+    ["sends no previewUrl", {}],
+    ["sends a null previewUrl", { previewUrl: null }],
+    ["sends an empty previewUrl", { previewUrl: "" }],
+  ])("an API that %s gives preview_url null", (_label, extra) => {
+    const detail = ShootDetailSchema.parse({
+      id: "shoot-1",
+      name: "Linen dress",
+      status: "COMPLETED",
+      counts: { queued: 0, running: 0, succeeded: 1, failed: 0, cancelled: 0 },
+      credits: { reserved: 20, charged: 20, refunded: 0 },
+      items: [{ id: "item-1", name: "Linen dress" }],
+      shots: [
+        {
+          itemId: "item-1",
+          status: "SUCCEEDED",
+          media: {
+            id: "media-0",
+            url: "https://cdn.test/photo-0.jpg",
+            ...extra,
+          },
+        },
+      ],
+    });
+
+    expect(toSessionStatus(detail, "https://web.test").photos).toEqual([
+      {
+        photo_id: "media-0",
+        url: "https://cdn.test/photo-0.jpg",
+        preview_url: null,
+        product: "Linen dress",
+      },
+    ]);
+  });
+
+  it("a preview that cannot be shown falls back to the photo itself", async () => {
+    mockApi(sessionsApi(), (request) =>
+      request.url.includes("/cdn-cgi/image/")
+        ? new Response(null, { status: 404 })
+        : cdn(),
+    );
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "get_photo_session",
+      arguments: { session_id: "shoot-1" },
+    });
+
+    expect(
+      z
+        .array(z.object({ type: z.string() }))
+        .parse(result.content)
+        .filter((part) => part.type === "image").length,
+    ).toBeGreaterThan(0);
   });
 
   it("a photo that declares more than 1 MB stays a link and is not downloaded", async () => {

@@ -133,6 +133,12 @@ describe("the sandbox", () => {
       status: "completed",
       done: 2,
     });
+    // The sandbox has no previews
+    expect(
+      z
+        .object({ photos: z.array(z.object({ preview_url: z.null() })) })
+        .parse(done.structuredContent).photos,
+    ).toHaveLength(2);
     expect(
       calls.filter(
         (c) =>
