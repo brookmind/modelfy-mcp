@@ -10,11 +10,15 @@ export const BASE_URL = process.env.EVALS_BASE_URL ?? DEV_URL;
 export const KV_BUDGET_APPLIES = BASE_URL === DEV_URL;
 export const MCP_URL = `${BASE_URL}/mcp`;
 
-/** The demo product the sandbox serves (a linen T-shirt). */
+/**
+ * The demo product (a linen T-shirt): fixed public test data, always the copy
+ * on mcp-dev. Anthropic's web fetch refuses tunnel domains, and reading it
+ * writes nothing, so a local server under test downloads it from there.
+ */
 export const DEMO = {
-  page: `${BASE_URL}/sandbox/demo/product`,
-  front: `${BASE_URL}/sandbox/demo/tee-front.png`,
-  back: `${BASE_URL}/sandbox/demo/tee-back.png`,
+  page: `${DEV_URL}/sandbox/demo/product`,
+  front: `${DEV_URL}/sandbox/demo/tee-front.png`,
+  back: `${DEV_URL}/sandbox/demo/tee-back.png`,
 };
 
 /** The agent under test, the person simulator and the judge (owner's call). */
