@@ -33,11 +33,23 @@ export interface Metrics {
   kvWrites: number;
 }
 
+/**
+ * What a run measured: bare (no agent-facing text), v0 (the first shipped
+ * server), v1 (the server after tuning).
+ */
+export const ArmSchema = z.enum(["bare", "v0", "v1"]);
+export type Arm = z.infer<typeof ArmSchema>;
+
+/** The sandbox key's agent layer for an arm: v0 and v1 differ by server. */
+export function layerOf(arm: Arm): AgentLayer {
+  return arm === "bare" ? "bare" : "v0";
+}
+
 export interface ResultRow {
   runId: string;
   task: string;
   suite: "a" | "b";
-  arm: AgentLayer;
+  arm: Arm;
   rep: number;
   /** Model ids as the API reported them */
   models: string[];
@@ -51,7 +63,7 @@ export const ResultRowSchema = z.object({
   runId: z.string(),
   task: z.string(),
   suite: z.enum(["a", "b"]),
-  arm: z.enum(["v0", "bare"]),
+  arm: ArmSchema,
   rep: z.number(),
   models: z.array(z.string()),
   grade: z.object({
@@ -89,7 +101,7 @@ export function redact(text: string): string {
     .replace(ANTHROPIC_KEY_PATTERN, "sk-ant-***");
 }
 
-export function rowKey(task: string, arm: AgentLayer, rep: number): string {
+export function rowKey(task: string, arm: Arm, rep: number): string {
   return `${task}|${arm}|${rep}`;
 }
 
@@ -151,20 +163,11 @@ export async function appendRow(path: string, row: ResultRow): Promise<void> {
   await appendFile(path, `${separator}${redact(JSON.stringify(row))}\n`);
 }
 
-function isRowKey(
-  value: unknown,
-): value is { task: string; arm: AgentLayer; rep: number } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "task" in value &&
-    typeof value.task === "string" &&
-    "arm" in value &&
-    (value.arm === "v0" || value.arm === "bare") &&
-    "rep" in value &&
-    typeof value.rep === "number"
-  );
-}
+const RowKeySchema = z.object({
+  task: z.string(),
+  arm: ArmSchema,
+  rep: z.number(),
+});
 
 /** The (task, arm, rep) runs already written, so a rerun resumes. */
 export async function doneKeys(path: string): Promise<Set<string>> {
@@ -178,8 +181,10 @@ export async function doneKeys(path: string): Promise<Set<string>> {
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     try {
-      const value: unknown = JSON.parse(line);
-      if (isRowKey(value)) keys.add(rowKey(value.task, value.arm, value.rep));
+      const key = RowKeySchema.safeParse(JSON.parse(line));
+      if (key.success) {
+        keys.add(rowKey(key.data.task, key.data.arm, key.data.rep));
+      }
     } catch {
       // A partial last line from a crash: that run is done again
     }
