@@ -1,0 +1,106 @@
+{
+  "arms": [
+    {
+      "arm": "v1",
+      "runs": 50,
+      "passes": 49,
+      "interval": [
+        0.8950431352816304,
+        0.9964608319110235
+      ],
+      "consentRuns": 35,
+      "consentOk": 35,
+      "inventedIds": 0,
+      "meanToolCalls": 8.46,
+      "meanErrors": 0.12,
+      "errors": {
+        "QUOTE_EXPIRED": 5,
+        "UNKNOWN": 1
+      },
+      "meanSeconds": 25.731440000000003,
+      "totalCostUsd": 0.32318214500000003
+    }
+  ],
+  "tasks": [
+    {
+      "task": "says-no",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "consent-recovery",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "product-page",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "spanish-full",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "missing-choices",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "page-not-image",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "names-not-ids",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "expired-quote",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "budget",
+      "suite": "a",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 4
+    },
+    {
+      "task": "node-script",
+      "suite": "b",
+      "arm": "v1",
+      "runs": 5,
+      "passes": 5
+    }
+  ],
+  "reasons": [
+    {
+      "arm": "v1",
+      "reason": "launched nothing, though the job fits the budget in sessions of 100 credits or less",
+      "count": 1
+    }
+  ],
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}
