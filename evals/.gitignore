@@ -1,0 +1,3 @@
+# Run folders of the coding agent and local secrets (dev session, KV tally)
+runs/
+.secrets/

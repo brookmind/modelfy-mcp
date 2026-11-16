@@ -1,0 +1,34 @@
+{
+  "name": "modelfy-mcp-evals",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent evals for the Modelfy MCP server: real agents against the sandbox",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "eval": "tsx src/run.ts",
+    "report": "tsx src/report-cli.ts",
+    "regrade": "tsx src/regrade-cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.325",
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.19.0",
+    "eslint": "^9.39.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^4.1.12"
+  },
+  "license": "MIT"
+}

@@ -78,6 +78,24 @@ Every session is planned first (`plan_photos`): the server keeps the exact plan 
 - **Live key (a bot):** no confirmation, but each key has a budget per photo session and per UTC day, enforced by the Modelfy API inside the same transaction that reserves the credits.
 - **Test and sandbox keys:** never reach a paid route.
 
+## Agent evals
+
+Real agents (Claude Haiku 5.5) run real tasks against the sandbox, and the harness grades the tool-call traces: did the job get done, did the agent ask before spending, did it invent ids. **bare** is the same server with no agent-facing text (no instructions, one-line tool descriptions, no guidance in results or errors, no docs), to show what that text is worth.
+
+| Chat assistant (Claude API + MCP connector), 9 tasks x 5 | bare    | v0      |
+| -------------------------------------------------------- | ------- | ------- |
+| Task success                                             | 27%     | 80%     |
+| Asked before spending                                    | 13/39   | 31/35   |
+| Invented ids                                             | 0       | 0       |
+| Tool errors per run                                      | 0.6     | 0.1     |
+| Cost per run                                             | $0.0043 | $0.0047 |
+
+Coding agent (Claude Agent SDK, no key to start with): builds a working Node integration 5/5, gets its own key through device login 5/5.
+
+What v0 still gets wrong, and the next round of tuning targets: a bot never splits a job that is over its per-session budget into smaller sessions (0/5), and a person who says "no need to ask" up front still gets a launch without seeing the price (1/5 asks).
+
+Full results, per task and with the failure reasons: [evals/REPORT.md](evals/REPORT.md). How it works and how to run it: [evals/DESIGN.md](evals/DESIGN.md), [evals/README.md](evals/README.md).
+
 ## Architecture
 
 ```mermaid

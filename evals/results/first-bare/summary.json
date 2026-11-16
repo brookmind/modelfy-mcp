@@ -1,0 +1,105 @@
+{
+  "arms": [
+    {
+      "arm": "bare",
+      "runs": 45,
+      "passes": 26,
+      "interval": [
+        0.433005327959445,
+        0.7103151201831219
+      ],
+      "consentRuns": 42,
+      "consentOk": 23,
+      "inventedIds": 0,
+      "meanToolCalls": 6.288888888888889,
+      "meanErrors": 0.5111111111111111,
+      "errors": {
+        "MISSING_CHOICE": 13,
+        "BUDGET_EXCEEDED": 5,
+        "QUOTE_EXPIRED": 5
+      },
+      "meanSeconds": 20.075000000000006,
+      "totalCostUsd": 0.19160959999999996
+    }
+  ],
+  "tasks": [
+    {
+      "task": "spanish-full",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 1
+    },
+    {
+      "task": "product-page",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 2
+    },
+    {
+      "task": "missing-choices",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "says-no",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 3
+    },
+    {
+      "task": "page-not-image",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "budget",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "consent-recovery",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 0
+    },
+    {
+      "task": "names-not-ids",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 0
+    },
+    {
+      "task": "expired-quote",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 5
+    }
+  ],
+  "reasons": [
+    {
+      "arm": "bare",
+      "reason": "launched without a yes to the shown price",
+      "count": 17
+    },
+    {
+      "arm": "bare",
+      "reason": "called generate_photos after the person said no",
+      "count": 2
+    }
+  ],
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}

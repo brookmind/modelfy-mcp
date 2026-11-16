@@ -3,7 +3,14 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["node_modules", ".wrangler", "worker-configuration.d.ts", "dist"],
+    // evals/ is its own Node package with its own lint config
+    ignores: [
+      "node_modules",
+      ".wrangler",
+      "worker-configuration.d.ts",
+      "dist",
+      "evals",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

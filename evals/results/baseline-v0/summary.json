@@ -1,0 +1,118 @@
+{
+  "arms": [
+    {
+      "arm": "v0",
+      "runs": 55,
+      "passes": 46,
+      "interval": [
+        0.717360036126882,
+        0.9114467944147754
+      ],
+      "consentRuns": 35,
+      "consentOk": 31,
+      "inventedIds": 0,
+      "meanToolCalls": 8.036363636363637,
+      "meanErrors": 0.21818181818181817,
+      "errors": {
+        "QUOTE_EXPIRED": 5,
+        "UNKNOWN": 7
+      },
+      "meanSeconds": 29.226800000000004,
+      "totalCostUsd": 0.33999661999999997
+    }
+  ],
+  "tasks": [
+    {
+      "task": "consent-recovery",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 1
+    },
+    {
+      "task": "page-not-image",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "says-no",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "product-page",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "spanish-full",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "missing-choices",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "names-not-ids",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "expired-quote",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "budget",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 0
+    },
+    {
+      "task": "node-script",
+      "suite": "b",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "device-login",
+      "suite": "b",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    }
+  ],
+  "reasons": [
+    {
+      "arm": "v0",
+      "reason": "launched nothing, though the job fits the budget in sessions of 100 credits or less",
+      "count": 5
+    },
+    {
+      "arm": "v0",
+      "reason": "launched without a yes to the shown price",
+      "count": 4
+    }
+  ],
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "arms": [
+    {
+      "arm": "v0",
+      "runs": 50,
+      "passes": 47,
+      "interval": [
+        0.8378265662912299,
+        0.9793854036353695
+      ],
+      "consentRuns": 35,
+      "consentOk": 32,
+      "inventedIds": 0,
+      "meanToolCalls": 7.9,
+      "meanErrors": 0.12,
+      "errors": {
+        "QUOTE_EXPIRED": 5,
+        "UNKNOWN": 1
+      },
+      "meanSeconds": 40.202299999999994,
+      "totalCostUsd": 0.30144946
+    }
+  ],
+  "tasks": [
+    {
+      "task": "product-page",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "spanish-full",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "missing-choices",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "says-no",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "consent-recovery",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 2
+    },
+    {
+      "task": "page-not-image",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "budget",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "expired-quote",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "names-not-ids",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "node-script",
+      "suite": "b",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    }
+  ],
+  "reasons": [
+    {
+      "arm": "v0",
+      "reason": "launched without a yes to the shown price",
+      "count": 3
+    }
+  ],
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}

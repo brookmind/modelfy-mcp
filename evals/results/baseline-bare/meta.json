@@ -1,0 +1,3 @@
+{
+  "server": "local wrangler dev of modelfy-mcp main a1bae80 (the code mcp-dev deployed at 2026-11-16 16:31 UTC, version 0c5d583e), local KV, reached through a Cloudflare quick tunnel; the one local change raises the sandbox-key limit for that URL to the 200 per hour mcp-dev has"
+}
