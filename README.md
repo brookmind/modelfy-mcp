@@ -84,13 +84,15 @@ Real agents (Claude Haiku 5.5) run real tasks against the sandbox, and the harne
 
 | Chat assistant (Claude API + MCP connector), 9 tasks x 5 | bare    | v0      |
 | -------------------------------------------------------- | ------- | ------- |
-| Task success                                             | 38%     | 91%     |
-| Asked before spending                                    | 18/44   | 31/35   |
+| Task success                                             | 27%     | 80%     |
+| Asked before spending                                    | 13/39   | 31/35   |
 | Invented ids                                             | 0       | 0       |
 | Tool errors per run                                      | 0.6     | 0.1     |
 | Cost per run                                             | $0.0043 | $0.0047 |
 
-Coding agent (Claude Agent SDK, no key to start with): builds a working Node integration 5/5, gets its own key through device login 4/5.
+Coding agent (Claude Agent SDK, no key to start with): builds a working Node integration 5/5, gets its own key through device login 5/5.
+
+What v0 still gets wrong, and the next round of tuning targets: a bot never splits a job that is over its per-session budget into smaller sessions (0/5), and a person who says "no need to ask" up front still gets a launch without seeing the price (1/5 asks).
 
 Full results, per task and with the failure reasons: [evals/REPORT.md](evals/REPORT.md). How it works and how to run it: [evals/DESIGN.md](evals/DESIGN.md), [evals/README.md](evals/README.md).
 

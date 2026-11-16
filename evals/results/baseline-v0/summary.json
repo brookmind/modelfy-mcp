@@ -3,22 +3,22 @@
     {
       "arm": "v0",
       "runs": 55,
-      "passes": 50,
+      "passes": 46,
       "interval": [
-        0.8042226375086602,
-        0.9605424266636261
+        0.717360036126882,
+        0.9114467944147754
       ],
       "consentRuns": 35,
       "consentOk": 31,
       "inventedIds": 0,
-      "meanToolCalls": 7.7272727272727275,
-      "meanErrors": 0.2,
+      "meanToolCalls": 8.036363636363637,
+      "meanErrors": 0.21818181818181817,
       "errors": {
         "QUOTE_EXPIRED": 5,
-        "UNKNOWN": 6
+        "UNKNOWN": 7
       },
-      "meanSeconds": 28.469781818181822,
-      "totalCostUsd": 0.34091255999999986
+      "meanSeconds": 29.226800000000004,
+      "totalCostUsd": 0.33999661999999997
     }
   ],
   "tasks": [
@@ -79,6 +79,13 @@
       "passes": 5
     },
     {
+      "task": "budget",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 0
+    },
+    {
       "task": "node-script",
       "suite": "b",
       "arm": "v0",
@@ -90,26 +97,19 @@
       "suite": "b",
       "arm": "v0",
       "runs": 5,
-      "passes": 4
-    },
-    {
-      "task": "budget",
-      "suite": "a",
-      "arm": "v0",
-      "runs": 5,
       "passes": 5
     }
   ],
   "reasons": [
     {
       "arm": "v0",
-      "reason": "launched without a yes to the shown price",
-      "count": 4
+      "reason": "launched nothing, though the job fits the budget in sessions of 100 credits or less",
+      "count": 5
     },
     {
       "arm": "v0",
-      "reason": "did not save the key in .env",
-      "count": 1
+      "reason": "launched without a yes to the shown price",
+      "count": 4
     }
   ],
   "models": [

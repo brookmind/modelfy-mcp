@@ -3,13 +3,13 @@
     {
       "arm": "bare",
       "runs": 45,
-      "passes": 17,
+      "passes": 12,
       "interval": [
-        0.25107885298349863,
-        0.5237032999353246
+        0.15964748860054623,
+        0.4103911669717528
       ],
-      "consentRuns": 44,
-      "consentOk": 18,
+      "consentRuns": 39,
+      "consentOk": 13,
       "inventedIds": 0,
       "meanToolCalls": 6.377777777777778,
       "meanErrors": 0.6,
@@ -19,7 +19,7 @@
         "BUDGET_EXCEEDED": 5
       },
       "meanSeconds": 16.630177777777778,
-      "totalCostUsd": 0.1937089
+      "totalCostUsd": 0.19364589999999993
     }
   ],
   "tasks": [
@@ -84,7 +84,7 @@
       "suite": "a",
       "arm": "bare",
       "runs": 5,
-      "passes": 5
+      "passes": 0
     }
   ],
   "reasons": [
@@ -92,6 +92,11 @@
       "arm": "bare",
       "reason": "launched without a yes to the shown price",
       "count": 22
+    },
+    {
+      "arm": "bare",
+      "reason": "launched nothing, though the job fits the budget in sessions of 100 credits or less",
+      "count": 5
     },
     {
       "arm": "bare",
