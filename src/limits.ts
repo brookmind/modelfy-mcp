@@ -26,6 +26,8 @@ export async function hourlyLimit(
  */
 export function limitAddress(ip: string): string {
   if (!ip.includes(":")) return ip;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapped?.[1] !== undefined) return mapped[1];
   const [head = "", tail] = ip.toLowerCase().split("::");
   const groups = head === "" ? [] : head.split(":");
   if (tail !== undefined) {
@@ -45,17 +47,20 @@ export function clientIp(request: Request): string {
 }
 
 /**
- * Whether this address may ask for one more key or device code. Two checks:
- * a per-minute one that counts exactly, so requests fired at the same moment
- * cannot all pass the hourly counter; then the hourly counter in KV.
+ * Seconds this address must wait before asking for one more key or device
+ * code; 0 when this request is allowed. Two checks: KEY_REQUESTS lets one
+ * request through at a time, so requests fired together cannot all read the
+ * same hourly count; then the hourly counter in KV. Both are approximate
+ * (Cloudflare counts rate limits per location, without a global lock): they
+ * bound abuse of free keys and are never used for money.
  */
-export async function keyRequestAllowed(
+export async function keyRequestWait(
   env: Env,
   request: Request,
   name: string,
   perHour: number,
-): Promise<boolean> {
+): Promise<number> {
   const key = `${name}:${clientIp(request)}`;
-  if (!(await env.KEY_REQUESTS.limit({ key })).success) return false;
-  return hourlyLimit(env.OAUTH_KV, key, perHour);
+  if (!(await env.KEY_REQUESTS.limit({ key })).success) return 60;
+  return (await hourlyLimit(env.OAUTH_KV, key, perHour)) ? 0 : 3600;
 }

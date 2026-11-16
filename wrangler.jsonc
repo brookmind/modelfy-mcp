@@ -8,10 +8,12 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": { "enabled": true },
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "local-oauth-kv" }],
-  // ANON_CALLS: calls per anonymous sandbox key. KEY_REQUESTS: sandbox keys
-  // and device codes asked by one address in a minute (the hourly limit is in
-  // KV). Both are counted per Cloudflare location, with no KV writes;
-  // namespace ids are unique per account, so each env has its own
+  // ANON_CALLS: calls per anonymous sandbox key. KEY_REQUESTS: one sandbox
+  // key or device code request per address every 10 seconds, so requests
+  // fired together cannot all pass the hourly limit kept in KV. Both are
+  // counted per Cloudflare location, with no KV writes; namespace ids are
+  // unique per account, so each env has its own. This top-level (local and
+  // tests) KEY_REQUESTS is loose: tests ask for many keys in a row
   "ratelimits": [
     {
       "name": "ANON_CALLS",
@@ -73,7 +75,7 @@
         {
           "name": "KEY_REQUESTS",
           "namespace_id": "4112",
-          "simple": { "limit": 10, "period": 60 },
+          "simple": { "limit": 1, "period": 10 },
         },
       ],
       "vars": {

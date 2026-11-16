@@ -143,8 +143,9 @@ export async function safeImageFetch(raw: string): Promise<DownloadedImage> {
 }
 
 /**
- * The same checks as `safeImageFetch` without downloading the photo: the
- * sandbox keeps no bytes, so it reads the headers and drops the body.
+ * Checks a link like `safeImageFetch` without downloading the photo: the
+ * sandbox keeps no bytes, so it reads the headers and drops the body. The
+ * size is the declared one; a photo that declares none is accepted here.
  */
 export async function checkImageLink(raw: string): Promise<void> {
   const { response } = await openImage(raw, AbortSignal.timeout(TIMEOUT_MS));

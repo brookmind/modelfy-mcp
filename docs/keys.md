@@ -37,7 +37,7 @@ curl -X POST https://mcp.modelfy.ai/sandbox/keys
 { "api_key": "mfy_test_…", "expires_at": "2026-12-15T10:00:00.000Z" }
 ```
 
-A free key with no account, valid for 30 days. Every tool works: the catalog is real, everything else is canned, the photos are samples marked SANDBOX, and nothing is spent. Limits: 5 keys per hour per address (an IPv6 address counts as its /64), 60 calls per minute per key.
+A free key with no account, valid for 30 days. Every tool works: the catalog is real, everything else is canned, the photos are samples marked SANDBOX, and nothing is spent. Limits: 5 keys per hour per address and one request every 10 seconds (an IPv6 address counts as its /64), 60 calls per minute per key.
 
 ### Try the spending rules
 
@@ -101,7 +101,7 @@ curl -X POST https://mcp.modelfy.ai/device/token \
 | `400 {"error": "access_denied"}`                               | The person said no | Stop                                                  |
 | `400 {"error": "expired_token"}`                               | 10 minutes passed  | Start again                                           |
 
-The key is delivered once. A server limits device codes to 10 per hour per address.
+The key is delivered once. The server limits device codes to 10 per hour per address and one request every 10 seconds (an IPv6 address counts as its /64).
 
 ## API keys by hand
 

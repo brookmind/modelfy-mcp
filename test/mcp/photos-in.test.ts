@@ -181,12 +181,28 @@ describe("checkImageLink", () => {
   });
 
   it("accepts an image from its headers, without reading the body", async () => {
-    mockApi(uploadsApi, imageHost);
+    let pulled = 0;
+    let cancelled = false;
+    mockApi(uploadsApi, () => {
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(new Uint8Array(1024 * 1024));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        },
+        { highWaterMark: 0 },
+      );
+      return new Response(body, { headers: { "Content-Type": "image/png" } });
+    });
 
-    // 20 MB with no declared length: reading it would be refused
-    await expect(
-      checkImageLink("https://shop.test/huge.png"),
-    ).resolves.toBeUndefined();
+    await checkImageLink("https://shop.test/endless.png");
+
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThanOrEqual(1);
   });
 
   it("refuses a declared length past 15 MB", async () => {

@@ -149,9 +149,21 @@ describe("anonymous sandbox keys", () => {
     );
 
     const created = responses.filter((response) => response.status === 200);
-    // The per-minute limit (10) holds even when the KV counter is raced
-    expect(created.length).toBeLessThanOrEqual(10);
+    const refused = responses.find((response) => response.status === 429);
+    // The test config lets 10 through KEY_REQUESTS (production: 1 per 10 s);
+    // without it all 30 would read the same hourly count and pass
     expect(created.length).toBeGreaterThan(0);
+    expect(created.length).toBeLessThanOrEqual(10);
+    expect(refused?.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("past the hourly limit the answer says to wait an hour", async () => {
+    for (let i = 0; i < 5; i++) await sandboxKey("203.0.113.78");
+
+    const refused = await sandboxKey("203.0.113.78");
+
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("Retry-After")).toBe("3600");
   });
 
   it.each([
@@ -160,6 +172,7 @@ describe("anonymous sandbox keys", () => {
     ["2001:0DB8:0007:0009:ffff:ffff:ffff:ffff", "2001:db8:7:9::/64"],
     ["2001:db8::1", "2001:db8:0:0::/64"],
     ["::1", "0:0:0:0::/64"],
+    ["::ffff:198.51.100.7", "198.51.100.7"],
   ])("limits count %s as %s", (ip, counted) => {
     expect(limitAddress(ip)).toBe(counted);
   });

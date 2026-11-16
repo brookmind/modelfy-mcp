@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { randomBase62, randomBase64Url, sha256Hex } from "../crypto";
-import { keyRequestAllowed } from "../limits";
+import { keyRequestWait } from "../limits";
 import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -101,19 +101,14 @@ export async function createSandboxKey(
     return invalidRequest('agent_layer "bare" is not available here.');
   }
   const perHour = sandboxKeysPerHour(env.SANDBOX_KEYS_PER_HOUR);
-  const allowed = await keyRequestAllowed(
-    env,
-    request,
-    "sandbox-keys",
-    perHour,
-  );
-  if (!allowed) {
+  const wait = await keyRequestWait(env, request, "sandbox-keys", perHour);
+  if (wait > 0) {
     return Response.json(
       {
         error: "rate_limited",
-        error_description: `At most ${perHour} sandbox keys per hour from one address. Reuse the key you have.`,
+        error_description: `At most ${perHour} sandbox keys per hour from one address, one request at a time. Reuse the key you have.`,
       },
-      { status: 429, headers: { "Retry-After": "3600" } },
+      { status: 429, headers: { "Retry-After": String(wait) } },
     );
   }
   const apiKey = `mfy_test_${randomBase62(43)}`;

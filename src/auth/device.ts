@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
-import { keyRequestAllowed } from "../limits";
+import { keyRequestWait } from "../limits";
 
 const StartedSchema = z.object({
   deviceCode: z.string(),
@@ -59,13 +59,18 @@ export async function startDevice(
   env: Env,
 ): Promise<Response> {
   // Every code costs a call to the API with the server secret: limit per address
-  const allowed = await keyRequestAllowed(
+  const wait = await keyRequestWait(
     env,
     request,
     "device-code",
     DEVICE_CODES_PER_IP_PER_HOUR,
   );
-  if (!allowed) return oauthError("slow_down", 429);
+  if (wait > 0) {
+    return Response.json(
+      { error: "slow_down" },
+      { status: 429, headers: { ...NO_STORE, "Retry-After": String(wait) } },
+    );
+  }
   const clientName = (await field(request, "client_name")) ?? "An AI agent";
   let started: z.infer<typeof StartedSchema>;
   try {
