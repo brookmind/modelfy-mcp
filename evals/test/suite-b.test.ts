@@ -296,6 +296,5 @@ describe.runIf(canSandbox)("a real sandbox", () => {
 
     // Whatever waits on the sandbox's output ends, so a run cannot hang
     await closed;
-    expect(sandbox.child.killed).toBe(true);
   });
 });

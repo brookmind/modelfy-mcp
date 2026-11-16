@@ -197,11 +197,16 @@ export function splitAdvice(
 ): string {
   if (plan.credits <= sessionLimit || plan.photos === 0) return "";
   const perPhoto = plan.credits / plan.photos;
-  const perSession = Math.floor(sessionLimit / perPhoto);
-  if (perSession === 0) {
-    return ` This is over this key's budget per photo session (${sessionLimit} credits) and one photo costs more than that: ask the key's owner to raise the budget.`;
+  const over = ` This is over this key's budget per photo session (${sessionLimit} credits)`;
+  if (perPhoto > sessionLimit) {
+    return `${over} and one photo costs more than that: ask the key's owner to raise the budget.`;
   }
-  return ` This is over this key's budget per photo session (${sessionLimit} credits), so generate_photos would refuse it: plan smaller sessions of at most ${perSession} photos each (for example fewer photos per product, or one product per session) and launch them one at a time; ${leftToday} credits are left today.`;
+  // A session must also fit what is left of the daily budget
+  const perSession = Math.floor(Math.min(sessionLimit, leftToday) / perPhoto);
+  if (perSession === 0) {
+    return `${over}, and the ${leftToday} credits left today are not enough for one photo: wait until the daily budget resets (budget.resetsAt) or ask the key's owner to raise it.`;
+  }
+  return `${over}, so generate_photos would refuse it: plan smaller sessions of at most ${perSession} photos each (for example fewer photos per product, or one product per session) and launch them one at a time; ${leftToday} credits are left today.`;
 }
 
 function statusSentence(status: SessionStatus, layer: LayerText): string {

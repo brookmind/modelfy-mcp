@@ -1,4 +1,4 @@
-// Runs the evals: npm run eval -- --suite a|b|all --arm v0|bare --reps N
+// Runs the evals: npm run eval -- --suite a|b|all --arm bare|v0|v1 --reps N
 //   [--tasks id,id] [--run-id id] [--concurrency N]
 // Needs ANTHROPIC_API_KEY. Reuse --run-id to resume a run that stopped.
 import Anthropic from "@anthropic-ai/sdk";

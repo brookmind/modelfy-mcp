@@ -1,6 +1,7 @@
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { splitAdvice } from "../../src/mcp/tools/sessions";
 import { call, connect, json, mockApi } from "../helpers/worker";
 
 // What the evals showed agents get wrong (evals/REPORT.md, part 5)
@@ -107,6 +108,19 @@ describe("a bot over its per-session budget", () => {
     expect(text).toContain("over this key's budget per photo session");
     expect(text).toContain("at most 5 photos");
     expect(text).toContain("one at a time");
+  });
+
+  it("a session also fits what is left of the daily budget", () => {
+    const plan = { launchBody: {}, credits: 320, photos: 16 };
+
+    // 40 credits left today at 20 per photo: 2 photos, not 5
+    expect(splitAdvice(plan, 100, 40)).toContain("at most 2 photos");
+    expect(splitAdvice(plan, 100, 10)).toContain(
+      "not enough for one photo: wait until the daily budget resets",
+    );
+    expect(splitAdvice(plan, 10, 500)).toContain(
+      "one photo costs more than that",
+    );
   });
 
   it("a plan within the session budget says nothing about splitting", async () => {
@@ -276,5 +290,28 @@ describe("uploaded photos", () => {
 
     expect(sentence).toContain(slot?.upload_id ?? "missing");
     expect(sentence).toContain("plan_photos as upload_ids");
+  });
+
+  it("a file not uploaded yet is pending, and the summary says to check again", async () => {
+    mockApi(() => json(500, {}));
+    const client = await connect(await sandboxKey({}, "198.51.100.89"));
+    const created = z.object({ session_id: z.string() }).parse(
+      (
+        await client.callTool({
+          name: "create_upload_session",
+          arguments: { files: [{ content_type: "image/png", bytes: 8 }] },
+        })
+      ).structuredContent,
+    );
+
+    const state = await client.callTool({
+      name: "get_uploaded_photos",
+      arguments: { session_id: created.session_id },
+    });
+    const sentence = Text.parse(state.content)[0]?.text ?? "";
+
+    expect(sentence).toContain("1 pending");
+    expect(sentence).toContain("call get_uploaded_photos again");
+    expect(sentence).not.toContain("Ready upload ids");
   });
 });
