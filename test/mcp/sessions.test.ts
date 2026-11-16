@@ -500,4 +500,39 @@ describe("plan, generate and follow photo sessions", () => {
         .filter((part) => part.type === "image"),
     ).toHaveLength(0);
   });
+
+  it("a photo that declares more than 1 MB stays a link and is not downloaded", async () => {
+    let pulled = 0;
+    mockApi(sessionsApi(), () => {
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(new Uint8Array(1024 * 1024));
+          },
+        },
+        { highWaterMark: 0 },
+      );
+      return new Response(body, {
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Content-Length": String(5 * 1024 * 1024),
+        },
+      });
+    });
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "get_photo_session",
+      arguments: { session_id: "shoot-1" },
+    });
+
+    expect(
+      z
+        .array(z.object({ type: z.string() }))
+        .parse(result.content)
+        .filter((part) => part.type === "image"),
+    ).toHaveLength(0);
+    expect(pulled).toBeLessThanOrEqual(4);
+  });
 });

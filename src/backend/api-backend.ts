@@ -109,23 +109,23 @@ export class ApiBackend implements PhotoBackend {
     };
   }
 
-  async addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
-    const added: AddedPhoto[] = [];
-    for (const url of urls) {
-      try {
-        added.push({ source_url: url, upload_id: await this.#upload(url) });
-      } catch (error) {
-        if (error instanceof AgentError) {
-          added.push({ source_url: url, error: error.message });
-        } else if (error instanceof ApiFailure && error.status === 400) {
-          // Modelfy rejected this file; the other links still go through
-          added.push({ source_url: url, error: `${url}: ${error.message}` });
-        } else {
+  addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
+    return Promise.all(
+      urls.map(async (url): Promise<AddedPhoto> => {
+        try {
+          return { source_url: url, upload_id: await this.#upload(url) };
+        } catch (error) {
+          if (error instanceof AgentError) {
+            return { source_url: url, error: error.message };
+          }
+          if (error instanceof ApiFailure && error.status === 400) {
+            // Modelfy rejected this file; the other links still go through
+            return { source_url: url, error: `${url}: ${error.message}` };
+          }
           throw error;
         }
-      }
-    }
-    return added;
+      }),
+    );
   }
 
   /** Download, create an upload, PUT the bytes to R2, confirm. */
@@ -162,19 +162,20 @@ export class ApiBackend implements PhotoBackend {
       undefined,
       UploadSessionSchema,
     );
-    const uploads = [];
-    for (const file of files) {
-      const slot = await this.#api.post(
-        `/v2/upload-sessions/${encodeURIComponent(session.id)}/uploads`,
-        { contentType: file.content_type, bytes: file.bytes },
-        CreatedUploadSchema,
-      );
-      uploads.push({
-        upload_id: slot.uploadId,
-        put_url: slot.uploadUrl,
-        headers: slot.headers,
-      });
-    }
+    const uploads = await Promise.all(
+      files.map(async (file) => {
+        const slot = await this.#api.post(
+          `/v2/upload-sessions/${encodeURIComponent(session.id)}/uploads`,
+          { contentType: file.content_type, bytes: file.bytes },
+          CreatedUploadSchema,
+        );
+        return {
+          upload_id: slot.uploadId,
+          put_url: slot.uploadUrl,
+          headers: slot.headers,
+        };
+      }),
+    );
     return {
       session_id: session.id,
       page_url: session.pageUrl,

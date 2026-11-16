@@ -240,6 +240,79 @@ describe("the sandbox", () => {
     });
   });
 
+  it("files PUT at the same moment are all ready, none is lost", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(TEST_KEY);
+    const created = z
+      .object({
+        session_id: z.string(),
+        uploads: z.array(
+          z.object({ upload_id: z.string(), put_url: z.string() }),
+        ),
+      })
+      .parse(
+        (
+          await client.callTool({
+            name: "create_upload_session",
+            arguments: {
+              files: Array.from({ length: 6 }, () => ({
+                content_type: "image/png",
+                bytes: 8,
+              })),
+            },
+          })
+        ).structuredContent,
+      );
+
+    await Promise.all(
+      created.uploads.map((slot) =>
+        exports.default.fetch(
+          new Request(slot.put_url, { method: "PUT", body: PNG }),
+        ),
+      ),
+    );
+    const state = z
+      .object({ ready_upload_ids: z.array(z.string()), pending: z.number() })
+      .parse(
+        (
+          await client.callTool({
+            name: "get_uploaded_photos",
+            arguments: { session_id: created.session_id },
+          })
+        ).structuredContent,
+      );
+
+    expect(state.pending).toBe(0);
+    expect([...state.ready_upload_ids].sort()).toEqual(
+      created.uploads.map((slot) => slot.upload_id).sort(),
+    );
+  });
+
+  it("a PUT that declares more than 15 MB is refused without reading it", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(TEST_KEY);
+    const created = z
+      .object({ uploads: z.array(z.object({ put_url: z.string() })) })
+      .parse(
+        (
+          await client.callTool({
+            name: "create_upload_session",
+            arguments: { files: [{ content_type: "image/png", bytes: 8 }] },
+          })
+        ).structuredContent,
+      );
+
+    const put = await exports.default.fetch(
+      new Request(created.uploads[0]?.put_url ?? "", {
+        method: "PUT",
+        headers: { "Content-Length": String(16 * 1024 * 1024) },
+        body: PNG,
+      }),
+    );
+
+    expect(put.status).toBe(400);
+  });
+
   it("an anonymous key sees only Modelfy's ready-made models", async () => {
     mockApi(catalogApi, images);
     const client = await connect(await anonymousKey());

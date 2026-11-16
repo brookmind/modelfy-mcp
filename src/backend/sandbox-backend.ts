@@ -102,6 +102,24 @@ export async function writeUploadState(
   });
 }
 
+function uploadedKey(sessionId: string, uploadId: string): string {
+  return `sbx-uploaded:${sessionId}:${uploadId}`;
+}
+
+/**
+ * Marks an announced file as arrived. Each file has its own key, so files
+ * sent at the same moment do not overwrite each other's state.
+ */
+export async function markUploaded(
+  kv: KVNamespace,
+  sessionId: string,
+  uploadId: string,
+): Promise<void> {
+  await kv.put(uploadedKey(sessionId, uploadId), "1", {
+    expirationTtl: UPLOAD_TTL_SECONDS,
+  });
+}
+
 /**
  * Test keys (design §7): the real catalog, everything else canned. Nothing
  * reaches a paid route, no credit is spent, no provider is called.
@@ -224,31 +242,29 @@ export class SandboxBackend implements PhotoBackend {
     }
   }
 
-  async addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
-    const added: AddedPhoto[] = [];
+  addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
     const demo = `${this.#env.PUBLIC_URL}/sandbox/demo/`;
-    for (const url of urls) {
-      // A Worker may not fetch its own domain: the demo is resolved here
-      if (url.startsWith(demo)) {
-        added.push(
-          demoImage(url.slice(demo.length)) === null
-            ? { source_url: url, error: `${url}: not an image` }
-            : { source_url: url, upload_id: `sbx_${randomBase64Url(12)}` },
-        );
-        continue;
-      }
-      try {
-        await checkImageLink(url);
-        added.push({
+    return Promise.all(
+      urls.map(async (url): Promise<AddedPhoto> => {
+        const added = {
           source_url: url,
           upload_id: `sbx_${randomBase64Url(12)}`,
-        });
-      } catch (error) {
-        if (!(error instanceof AgentError)) throw error;
-        added.push({ source_url: url, error: error.message });
-      }
-    }
-    return added;
+        };
+        // A Worker may not fetch its own domain: the demo is resolved here
+        if (url.startsWith(demo)) {
+          return demoImage(url.slice(demo.length)) === null
+            ? { source_url: url, error: `${url}: not an image` }
+            : added;
+        }
+        try {
+          await checkImageLink(url);
+          return added;
+        } catch (error) {
+          if (!(error instanceof AgentError)) throw error;
+          return { source_url: url, error: error.message };
+        }
+      }),
+    );
   }
 
   async createUploadSession(files: FileToUpload[]): Promise<UploadSession> {
@@ -285,12 +301,18 @@ export class SandboxBackend implements PhotoBackend {
         "Call create_upload_session again.",
       );
     }
-    const entries = Object.entries(state.files);
+    const kv = this.#env.OAUTH_KV;
+    const files = await Promise.all(
+      Object.entries(state.files).map(async ([id, status]) => ({
+        id,
+        ready:
+          status === "ready" ||
+          (await kv.get(uploadedKey(sessionId, id))) !== null,
+      })),
+    );
     return {
-      ready_upload_ids: entries
-        .filter(([, s]) => s === "ready")
-        .map(([id]) => id),
-      pending: entries.filter(([, s]) => s === "pending").length,
+      ready_upload_ids: files.filter((file) => file.ready).map(({ id }) => id),
+      pending: files.filter((file) => !file.ready).length,
       rejected: [],
     };
   }

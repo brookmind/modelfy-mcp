@@ -149,22 +149,30 @@ function wait(ms: number): Promise<void> {
 async function imageContent(
   status: SessionStatus,
 ): Promise<CallToolResult["content"]> {
-  const images: CallToolResult["content"] = [];
-  for (const photo of status.photos.slice(0, MAX_IMAGES)) {
-    try {
-      const response = await fetch(photo.url);
-      const type =
-        (response.headers.get("Content-Type") ?? "").split(";")[0]?.trim() ??
-        "";
-      if (!response.ok || !RASTER_TYPES.has(type)) continue;
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength > MAX_IMAGE_BYTES) continue;
-      images.push({ type: "image", data: base64(bytes), mimeType: type });
-    } catch {
-      // A photo that cannot be fetched stays a link
+  const images = await Promise.all(
+    status.photos.slice(0, MAX_IMAGES).map((photo) => smallImage(photo.url)),
+  );
+  return images.flat();
+}
+
+/** One photo as image content, or nothing: it then stays a link. */
+async function smallImage(url: string): Promise<CallToolResult["content"]> {
+  try {
+    const response = await fetch(url);
+    const type =
+      (response.headers.get("Content-Type") ?? "").split(";")[0]?.trim() ?? "";
+    const declared = Number(response.headers.get("Content-Length") ?? "0");
+    if (!response.ok || !RASTER_TYPES.has(type) || declared > MAX_IMAGE_BYTES) {
+      // Decided from the headers: the photo itself is not downloaded
+      await response.body?.cancel();
+      return [];
     }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > MAX_IMAGE_BYTES) return [];
+    return [{ type: "image", data: base64(bytes), mimeType: type }];
+  } catch {
+    return [];
   }
-  return images;
 }
 
 function statusSentence(status: SessionStatus, layer: LayerText): string {

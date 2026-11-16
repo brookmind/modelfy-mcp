@@ -1,6 +1,10 @@
 import { randomBase64Url } from "./crypto";
 import { MAX_BYTES } from "./backend/download";
-import { readUploadState, writeUploadState } from "./backend/sandbox-backend";
+import {
+  markUploaded,
+  readUploadState,
+  writeUploadState,
+} from "./backend/sandbox-backend";
 import { MAX_UPLOAD_FILES } from "./backend/types";
 import { htmlPage } from "./pages/layout";
 import {
@@ -65,12 +69,16 @@ export async function sandboxRoute(
     if (state === null || state.files[uploadId] !== "pending") {
       return Response.json({ error: "NOT_FOUND" }, { status: 404 });
     }
-    const bytes = (await request.arrayBuffer()).byteLength;
-    if (bytes === 0 || bytes > MAX_BYTES) {
+    // The declared size decides when there is one: the body is not read
+    const declared = request.headers.get("Content-Length");
+    const bytes =
+      declared !== null
+        ? Number(declared)
+        : (await request.arrayBuffer()).byteLength;
+    if (!(bytes > 0) || bytes > MAX_BYTES) {
       return Response.json({ error: "UPLOAD_REJECTED" }, { status: 400 });
     }
-    state.files[uploadId] = "ready";
-    await writeUploadState(env.OAUTH_KV, sessionId, state);
+    await markUploaded(env.OAUTH_KV, sessionId, uploadId);
     return new Response(null, { status: 200 });
   }
 
