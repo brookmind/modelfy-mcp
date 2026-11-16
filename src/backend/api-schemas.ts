@@ -1,21 +1,23 @@
 import { z } from "zod";
+import { BudgetLimitsSchema } from "../auth/props";
 
-/** `/v2` response shapes used by the API backend (from the API's OpenAPI). */
+/** `/v2` response shapes this server reads (from the API's OpenAPI). */
 
-export const MeSchema = z.object({
+/** A budget as the API reports it: the limits and today's spend. */
+export const BudgetSchema = BudgetLimitsSchema.extend({
+  spentToday: z.number(),
+  resetsAt: z.string(),
+});
+
+/** `/v2/connections/me`: whose token this is. */
+export const ConnectionSchema = z.object({
   userId: z.string(),
   kind: z.enum(["LIVE", "TEST", "OAUTH"]),
   name: z.string(),
-  credits: z.number(),
-  budget: z
-    .object({
-      maxCreditsPerSession: z.number(),
-      maxCreditsPerDay: z.number(),
-      spentToday: z.number(),
-      resetsAt: z.string(),
-    })
-    .nullable(),
+  budget: BudgetSchema.nullable(),
 });
+
+export const MeSchema = ConnectionSchema.extend({ credits: z.number() });
 
 export const BillingSchema = z.object({
   current: z.object({ name: z.string() }).nullable(),

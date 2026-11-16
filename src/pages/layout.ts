@@ -26,8 +26,16 @@ const STYLE = `
   blockquote { margin: 0; padding-left: 1rem; border-left: 2px solid #333; }
 `;
 
-/** A public page of this server: the shared look, then the body as given. */
-export function htmlPage(title: string, body: string): Response {
+/**
+ * A page of this server: the shared look, then the body as given. Without a
+ * `status` it is a public page that caches may keep; with one it answers a
+ * single request (a sign-in step, a sandbox page) and is not cached.
+ */
+export function htmlPage(
+  title: string,
+  body: string,
+  status?: number,
+): Response {
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -43,9 +51,12 @@ ${body}
 </body>
 </html>`;
   return new Response(html, {
+    status: status ?? 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=300",
+      ...(status === undefined
+        ? { "Cache-Control": "public, max-age=300" }
+        : {}),
     },
   });
 }

@@ -23,7 +23,7 @@ const ErrorBody = z.object({
 
 const Envelope = z.object({ data: z.unknown() });
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST";
 
 /**
  * The Modelfy `/v2` API as this server uses it: every request carries the
@@ -45,14 +45,6 @@ export class ModelfyApi {
 
   post<T>(path: string, body: unknown, schema: ZodType<T>): Promise<T> {
     return this.#call("POST", path, body, schema);
-  }
-
-  patch<T>(path: string, body: unknown, schema: ZodType<T>): Promise<T> {
-    return this.#call("PATCH", path, body, schema);
-  }
-
-  delete<T>(path: string, schema: ZodType<T>): Promise<T> {
-    return this.#call("DELETE", path, undefined, schema);
   }
 
   async #call<T>(

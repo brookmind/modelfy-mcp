@@ -11,7 +11,8 @@ export type ActsAs = z.infer<typeof ActsAsSchema>;
 export const AgentLayerSchema = z.enum(["v0", "bare"]);
 export type AgentLayer = z.infer<typeof AgentLayerSchema>;
 
-const BudgetSchema = z.object({
+/** A live key's limits: the most one launch, and one UTC day, can cost. */
+export const BudgetLimitsSchema = z.object({
   maxCreditsPerSession: z.number(),
   maxCreditsPerDay: z.number(),
 });
@@ -26,7 +27,7 @@ export const GrantPropsSchema = z.object({
   userId: z.string().nullable(),
   apiToken: z.string().nullable(),
   sandboxId: z.string().nullable(),
-  budget: BudgetSchema.nullable(),
+  budget: BudgetLimitsSchema.nullable(),
   // Defaults keep grants stored before these fields existed valid
   actsAs: ActsAsSchema.nullable().default(null),
   agentLayer: AgentLayerSchema.default("v0"),

@@ -10,12 +10,14 @@ export async function sha256Hex(value: string): Promise<string> {
   ).join("");
 }
 
-export function randomBase64Url(bytes: number): string {
+export function base64(bytes: Uint8Array): string {
   let binary = "";
-  for (const byte of crypto.getRandomValues(new Uint8Array(bytes))) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export function randomBase64Url(bytes: number): string {
+  return base64(crypto.getRandomValues(new Uint8Array(bytes)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
