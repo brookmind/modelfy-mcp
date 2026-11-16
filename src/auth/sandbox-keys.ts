@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { randomBase62, randomBase64Url, sha256Hex } from "../crypto";
-import { keyRequestWait } from "../limits";
+import { DAY_MS, keyRequestWait, windowLimit } from "../limits";
 import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_KEYS_PER_IP_PER_HOUR = 5;
+const DEFAULT_KEYS_PER_DAY = 100;
 
 /** The budget of a sandbox key that acts as a bot: a new live key's defaults */
 export const SANDBOX_BOT_BUDGET = {
@@ -30,11 +31,20 @@ export function bareLayerAllowed(setting: string | undefined): boolean {
   return setting === "true";
 }
 
-export function sandboxKeysPerHour(setting: string | undefined): number {
+/** A limit from the Worker's vars: a positive whole number, or the default. */
+export function limitSetting(
+  setting: string | undefined,
+  fallback: number,
+): number {
   const value = Number.parseInt(setting ?? "", 10);
-  return Number.isInteger(value) && value > 0
-    ? value
-    : DEFAULT_KEYS_PER_IP_PER_HOUR;
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function tooMany(description: string, retryAfter: number): Response {
+  return Response.json(
+    { error: "rate_limited", error_description: description },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
 }
 
 function invalidRequest(description: string): Response {
@@ -100,15 +110,23 @@ export async function createSandboxKey(
   ) {
     return invalidRequest('agent_layer "bare" is not available here.');
   }
-  const perHour = sandboxKeysPerHour(env.SANDBOX_KEYS_PER_HOUR);
+  const perHour = limitSetting(
+    env.SANDBOX_KEYS_PER_HOUR,
+    DEFAULT_KEYS_PER_IP_PER_HOUR,
+  );
   const wait = await keyRequestWait(env, request, "sandbox-keys", perHour);
   if (wait > 0) {
-    return Response.json(
-      {
-        error: "rate_limited",
-        error_description: `At most ${perHour} sandbox keys per hour from one address, one request at a time. Reuse the key you have.`,
-      },
-      { status: 429, headers: { "Retry-After": String(wait) } },
+    return tooMany(
+      `At most ${perHour} sandbox keys per hour from one address, one request at a time. Reuse the key you have.`,
+      wait,
+    );
+  }
+  // All addresses together: free keys cannot use up the storage sign-ins need
+  const perDay = limitSetting(env.SANDBOX_KEYS_PER_DAY, DEFAULT_KEYS_PER_DAY);
+  if (!(await windowLimit(env.OAUTH_KV, "sandbox-keys-all", perDay, DAY_MS))) {
+    return tooMany(
+      "No more free sandbox keys today (the daily total resets at 00:00 UTC). Reuse a key you have, or get your own with device login (POST /device/code).",
+      3600,
     );
   }
   const apiKey = `mfy_test_${randomBase62(43)}`;

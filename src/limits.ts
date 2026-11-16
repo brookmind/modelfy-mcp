@@ -1,21 +1,25 @@
 const HOUR_MS = 60 * 60 * 1000;
+export const DAY_MS = 24 * HOUR_MS;
 
 /**
- * Counts one use of `key` in the current hour and says whether it is within
- * `max`. KV is eventually consistent, so the limit is approximate: enough to
- * stop abuse of free sandbox keys, never used for money.
+ * Counts one use of `key` in the current window (an hour, a UTC day) and
+ * says whether it is within `max`. KV is eventually consistent, so the limit
+ * is approximate: enough to stop abuse of free sandbox keys, never used for
+ * money.
  */
-export async function hourlyLimit(
+export async function windowLimit(
   kv: KVNamespace,
   key: string,
   max: number,
+  windowMs: number,
   now: number = Date.now(),
 ): Promise<boolean> {
-  const window = Math.floor(now / HOUR_MS);
-  const counterKey = `limit:${key}:${window}`;
+  const counterKey = `limit:${key}:${Math.floor(now / windowMs)}`;
   const used = Number((await kv.get(counterKey)) ?? "0");
   if (used >= max) return false;
-  await kv.put(counterKey, String(used + 1), { expirationTtl: 2 * 60 * 60 });
+  await kv.put(counterKey, String(used + 1), {
+    expirationTtl: (2 * windowMs) / 1000,
+  });
   return true;
 }
 
@@ -62,5 +66,5 @@ export async function keyRequestWait(
 ): Promise<number> {
   const key = `${name}:${clientIp(request)}`;
   if (!(await env.KEY_REQUESTS.limit({ key })).success) return 60;
-  return (await hourlyLimit(env.OAUTH_KV, key, perHour)) ? 0 : 3600;
+  return (await windowLimit(env.OAUTH_KV, key, perHour, HOUR_MS)) ? 0 : 3600;
 }

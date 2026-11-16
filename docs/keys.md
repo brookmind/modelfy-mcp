@@ -37,7 +37,7 @@ curl -X POST https://mcp.modelfy.ai/sandbox/keys
 { "api_key": "mfy_test_…", "expires_at": "2026-12-15T10:00:00.000Z" }
 ```
 
-A free key with no account, valid for 30 days. Every tool works: the catalog is real, everything else is canned, the photos are samples marked SANDBOX, and nothing is spent. Limits: 5 keys per hour per address and one request every 10 seconds (an IPv6 address counts as its /64), 60 calls per minute per key.
+A free key with no account, valid for 30 days. Every tool works: the catalog is real, everything else is canned, the photos are samples marked SANDBOX, and nothing is spent. Limits: 5 keys per hour per address and one request every 10 seconds (an IPv6 address counts as its /64), 60 calls per minute per key. There is also a daily total of free keys for everyone; when it is used up the answer is `429` until 00:00 UTC, and device login still works.
 
 ### Try the spending rules
 

@@ -4,7 +4,7 @@ import { env } from "cloudflare:workers";
 import {
   bareLayerAllowed,
   createSandboxKey,
-  sandboxKeysPerHour,
+  limitSetting,
 } from "../../src/auth/sandbox-keys";
 import { limitAddress } from "../../src/limits";
 import { call, connect, json, mockApi } from "../helpers/worker";
@@ -407,9 +407,19 @@ describe("sandbox key options", () => {
     expect(bareLayerAllowed("false")).toBe(false);
   });
 
-  it("the keys per hour come from SANDBOX_KEYS_PER_HOUR, 5 by default", () => {
-    expect(sandboxKeysPerHour("200")).toBe(200);
-    expect(sandboxKeysPerHour(undefined)).toBe(5);
-    expect(sandboxKeysPerHour("not a number")).toBe(5);
+  it("a limit comes from its var, or the default when it is not a number", () => {
+    expect(limitSetting("200", 5)).toBe(200);
+    expect(limitSetting(undefined, 5)).toBe(5);
+    expect(limitSetting("not a number", 5)).toBe(5);
+  });
+
+  it("past the daily total of all addresses, a new address gets 429", async () => {
+    const day = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    await env.OAUTH_KV.put(`limit:sandbox-keys-all:${day}`, "1000");
+
+    const refused = await sandboxKey("203.0.113.90");
+
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toMatchObject({ error: "rate_limited" });
   });
 });
