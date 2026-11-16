@@ -59,7 +59,7 @@
     "production": {
       "routes": [{ "pattern": "mcp.modelfy.ai", "custom_domain": true }],
       "kv_namespaces": [
-        { "binding": "OAUTH_KV", "id": "TO_BE_CREATED_PRODUCTION" },
+        { "binding": "OAUTH_KV", "id": "23bfd9d6f30546a58fe7fcf18e7e8fac" },
       ],
       "ratelimits": [
         {
