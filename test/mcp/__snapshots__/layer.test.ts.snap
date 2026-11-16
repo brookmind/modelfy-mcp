@@ -887,6 +887,12 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
                 "photo_id": {
                   "type": "string",
                 },
+                "preview_url": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
                 "product": {
                   "type": [
                     "string",
@@ -900,6 +906,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
               "required": [
                 "photo_id",
                 "url",
+                "preview_url",
                 "product",
               ],
               "type": "object",
@@ -1006,6 +1013,12 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
                 "photo_id": {
                   "type": "string",
                 },
+                "preview_url": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
                 "product": {
                   "type": [
                     "string",
@@ -1019,6 +1032,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
               "required": [
                 "photo_id",
                 "url",
+                "preview_url",
                 "product",
               ],
               "type": "object",
@@ -1191,6 +1205,12 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
                 "photo_id": {
                   "type": "string",
                 },
+                "preview_url": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
                 "product": {
                   "type": [
                     "string",
@@ -1204,6 +1224,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
               "required": [
                 "photo_id",
                 "url",
+                "preview_url",
                 "product",
               ],
               "type": "object",

@@ -500,6 +500,7 @@ export class SandboxBackend implements PhotoBackend {
       photos: Array.from({ length: done }, (_, index) => ({
         photo_id: `${id}_${index}`,
         url: samplePhotoUrl(this.#env.PUBLIC_URL, index),
+        preview_url: null,
         product: session.product,
       })),
       web_url: `${this.#env.PUBLIC_URL}/sandbox/sessions/${id}`,

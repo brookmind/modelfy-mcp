@@ -24,6 +24,7 @@ export function toSessionStatus(
           {
             photo_id: shot.media.id,
             url: shot.media.url,
+            preview_url: shot.media.previewUrl ?? null,
             product: names.get(shot.itemId) ?? null,
           },
         ]

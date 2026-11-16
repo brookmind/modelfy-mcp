@@ -156,6 +156,8 @@ export type SessionState = (typeof SESSION_STATES)[number];
 export interface SessionPhoto {
   photo_id: string;
   url: string;
+  /** A small JPEG of the photo, light enough to show in a chat */
+  preview_url: string | null;
   product: string | null;
 }
 

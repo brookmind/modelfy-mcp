@@ -67,7 +67,11 @@ function detail(status: string, succeeded: number): unknown {
         credits: 20,
         media:
           i < succeeded
-            ? { id: `media-${i}`, url: `https://cdn.test/photo-${i}.jpg` }
+            ? {
+                id: `media-${i}`,
+                url: `https://cdn.test/photo-${i}.jpg`,
+                previewUrl: `https://cdn.test/cdn-cgi/image/width=1024/photo-${i}.jpg`,
+              }
             : null,
       })),
       createdAt: "2026-11-15T10:00:00.000Z",
@@ -499,6 +503,35 @@ describe("plan, generate and follow photo sessions", () => {
         .parse(result.content)
         .filter((part) => part.type === "image"),
     ).toHaveLength(0);
+  });
+
+  it("the images shown come from the small previews, not the full photos", async () => {
+    const fetched: string[] = [];
+    mockApi(sessionsApi(), (request) => {
+      fetched.push(request.url);
+      return cdn();
+    });
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "get_photo_session",
+      arguments: { session_id: "shoot-1" },
+    });
+
+    expect(fetched.length).toBeGreaterThan(0);
+    expect(fetched.every((url) => url.includes("/cdn-cgi/image/"))).toBe(true);
+    expect(
+      z
+        .object({
+          photos: z.array(
+            z.object({ url: z.string(), preview_url: z.string() }),
+          ),
+        })
+        .parse(result.structuredContent).photos[0],
+    ).toEqual({
+      url: "https://cdn.test/photo-0.jpg",
+      preview_url: "https://cdn.test/cdn-cgi/image/width=1024/photo-0.jpg",
+    });
   });
 
   it("a photo that declares more than 1 MB stays a link and is not downloaded", async () => {
