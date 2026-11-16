@@ -37,6 +37,7 @@ import type {
 } from "./types";
 
 const READY_CAST = new Set(["READY", "PARTIAL"]);
+const UPLOADS_AT_ONCE = 3;
 
 /** A live key or an OAuth connection: the real Modelfy API with the user's token. */
 export class ApiBackend implements PhotoBackend {
@@ -109,23 +110,29 @@ export class ApiBackend implements PhotoBackend {
     };
   }
 
-  addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
-    return Promise.all(
-      urls.map(async (url): Promise<AddedPhoto> => {
-        try {
-          return { source_url: url, upload_id: await this.#upload(url) };
-        } catch (error) {
-          if (error instanceof AgentError) {
-            return { source_url: url, error: error.message };
-          }
-          if (error instanceof ApiFailure && error.status === 400) {
-            // Modelfy rejected this file; the other links still go through
-            return { source_url: url, error: `${url}: ${error.message}` };
-          }
-          throw error;
-        }
-      }),
-    );
+  async addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]> {
+    const added: AddedPhoto[] = [];
+    // A few at a time: each photo (up to 15 MB) is held in memory until sent
+    for (let at = 0; at < urls.length; at += UPLOADS_AT_ONCE) {
+      const group = urls.slice(at, at + UPLOADS_AT_ONCE);
+      added.push(...(await Promise.all(group.map((url) => this.#add(url)))));
+    }
+    return added;
+  }
+
+  async #add(url: string): Promise<AddedPhoto> {
+    try {
+      return { source_url: url, upload_id: await this.#upload(url) };
+    } catch (error) {
+      if (error instanceof AgentError) {
+        return { source_url: url, error: error.message };
+      }
+      if (error instanceof ApiFailure && error.status === 400) {
+        // Modelfy rejected this file; the other links still go through
+        return { source_url: url, error: `${url}: ${error.message}` };
+      }
+      throw error;
+    }
   }
 
   /** Download, create an upload, PUT the bytes to R2, confirm. */
