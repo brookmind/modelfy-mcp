@@ -42,6 +42,8 @@ describe("the sandbox demo product", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/html");
+    // Sandbox and sign-in pages answer one request: never cacheable
+    expect(response.headers.get("Cache-Control")).toBeNull();
     expect(html).toContain(FRONT);
     expect(html).toContain(BACK);
   });
