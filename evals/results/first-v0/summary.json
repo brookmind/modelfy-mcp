@@ -2,23 +2,23 @@
   "arms": [
     {
       "arm": "v0",
-      "runs": 55,
-      "passes": 52,
+      "runs": 50,
+      "passes": 47,
       "interval": [
-        0.8514670569551007,
-        0.9812771240324999
+        0.8378265662912299,
+        0.9793854036353695
       ],
       "consentRuns": 35,
       "consentOk": 32,
       "inventedIds": 0,
-      "meanToolCalls": 8.145454545454545,
-      "meanErrors": 0.10909090909090909,
+      "meanToolCalls": 7.9,
+      "meanErrors": 0.12,
       "errors": {
         "QUOTE_EXPIRED": 5,
         "UNKNOWN": 1
       },
-      "meanSeconds": 62.245799999999996,
-      "totalCostUsd": 0.410563385
+      "meanSeconds": 40.202299999999994,
+      "totalCostUsd": 0.30144946
     }
   ],
   "tasks": [
@@ -87,13 +87,6 @@
     },
     {
       "task": "node-script",
-      "suite": "b",
-      "arm": "v0",
-      "runs": 5,
-      "passes": 5
-    },
-    {
-      "task": "device-login",
       "suite": "b",
       "arm": "v0",
       "runs": 5,

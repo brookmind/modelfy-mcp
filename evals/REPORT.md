@@ -1,6 +1,8 @@
 # Agent evals: results
 
-Runs: `baseline-bare`, `baseline-v0`. Models: claude-haiku-5-5. Server: the Modelfy MCP sandbox on mcp-dev (nothing is spent). How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
+Runs: `first-bare`, `first-v0`. Models: claude-haiku-5-5. Server: the Modelfy MCP sandbox on mcp-dev (nothing is spent). How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
+
+Server measured by each run: `first-bare`: mcp-dev Worker version 91de9ef4 (modelfy-mcp main 224c846, deployed 2026-11-16 13:36 UTC); `first-v0`: mcp-dev Worker version 91de9ef4 (modelfy-mcp main 224c846, deployed 2026-11-16 13:36 UTC).
 
 Arms: **bare** is the same server with no agent-facing text (no instructions, one-line tool descriptions, no schema descriptions, no guidance in results or errors, no docs); **v0** is the server as shipped before tuning; **v1** is after tuning.
 
@@ -48,22 +50,21 @@ Claude Agent SDK in an empty folder with no key: it finds the docs, gets a key a
 
 | Metric | v0 |
 | --- | --- |
-| Runs | 10 |
-| Task success (95% interval) | 100% (72%–100%) |
+| Runs | 5 |
+| Task success (95% interval) | 100% (57%–100%) |
 | Asked before spending | – |
 | Invented ids (total) | 0 |
-| Tool calls per run | 13.9 |
-| Tool errors per run | 0.1 |
-| Seconds per run | 242 |
-| Cost per run (USD) | $0.0197 |
-| Total cost (USD) | $0.20 |
+| Tool calls per run | 17.2 |
+| Tool errors per run | 0.2 |
+| Seconds per run | 200 |
+| Cost per run (USD) | $0.0175 |
+| Total cost (USD) | $0.09 |
 
 Per task (passes / runs):
 
 | Task | v0 |
 | --- | --- |
 | node-script | 5/5 |
-| device-login | 5/5 |
 
 Why runs failed:
 

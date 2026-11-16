@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import { randomUUID } from "node:crypto";
 import { runChat } from "./agents/chat.ts";
 import { runCoder } from "./agents/coder.ts";
-import { DEMO, KV_WRITES_PER_DAY } from "./config.ts";
+import { DEMO, KV_BUDGET_APPLIES, KV_WRITES_PER_DAY } from "./config.ts";
 import { approveDevice, revokeKeyNamed } from "./device-approver.ts";
 import { checkCodeTask, SUITE_B } from "./tasks/suite-b.ts";
 import { makeJudge } from "./grade/judge.ts";
@@ -179,7 +179,10 @@ async function main(): Promise<void> {
       next !== undefined && !stopped;
       next = pending.shift()
     ) {
-      if ((await kvWritesToday()) + KV_RESERVE_PER_RUN > KV_WRITES_PER_DAY) {
+      if (
+        KV_BUDGET_APPLIES &&
+        (await kvWritesToday()) + KV_RESERVE_PER_RUN > KV_WRITES_PER_DAY
+      ) {
         stopped = true;
         console.log(
           "stopping: the dev Worker's KV write budget for today is used up; rerun with the same --run-id tomorrow",
@@ -194,7 +197,7 @@ async function main(): Promise<void> {
         );
         const metrics = metricsOf(trace, extraUsages);
         if (kvWrites !== undefined) metrics.kvWrites = kvWrites;
-        await addKvWrites(metrics.kvWrites);
+        if (KV_BUDGET_APPLIES) await addKvWrites(metrics.kvWrites);
         const row: ResultRow = {
           runId,
           task: job.task,

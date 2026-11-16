@@ -1,5 +1,13 @@
-/** The dev server under test; production is never used by the evals. */
-export const BASE_URL = "https://mcp-dev.modelfy.ai";
+const DEV_URL = "https://mcp-dev.modelfy.ai";
+
+/**
+ * The server under test: mcp-dev, or a pinned local copy of the Worker
+ * reached through a tunnel (EVALS_BASE_URL), which has no KV write limit and
+ * never changes under a run. Production is never used by the evals.
+ */
+export const BASE_URL = process.env.EVALS_BASE_URL ?? DEV_URL;
+/** Workers Free's KV write limit binds only the deployed dev Worker. */
+export const KV_BUDGET_APPLIES = BASE_URL === DEV_URL;
 export const MCP_URL = `${BASE_URL}/mcp`;
 
 /** The demo product the sandbox serves (a linen T-shirt). */
