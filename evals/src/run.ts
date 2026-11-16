@@ -32,6 +32,8 @@ const KV_RESERVE_PER_RUN = 25;
 export interface Job {
   task: string;
   suite: "a" | "b";
+  /** Consent is measured only with a person in the chat */
+  personInChat: boolean;
   run(
     client: Anthropic,
     arm: AgentLayer,
@@ -47,6 +49,7 @@ export interface Job {
 const SUITE_A_JOBS: Job[] = SUITE_A.map((task) => ({
   task: task.id,
   suite: "a",
+  personInChat: task.actsAs === "person",
   async run(client, arm) {
     const key = await createSandboxKey({
       actsAs: task.actsAs,
@@ -65,6 +68,7 @@ const SUITE_B_KV_WRITES = 15;
 const SUITE_B_JOBS: Job[] = SUITE_B.map((task) => ({
   task: task.id,
   suite: "b",
+  personInChat: false,
   async run() {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (anthropicKey === undefined || anthropicKey === "") {
@@ -87,12 +91,18 @@ const SUITE_B_JOBS: Job[] = SUITE_B.map((task) => ({
       anthropicKey,
       (code) => approveDevice(code, keyName),
     );
-    try {
-      const grade = await checkCodeTask(task, trace, paths, approvedCode);
-      return { trace, grade, extraUsages: [], kvWrites: SUITE_B_KV_WRITES };
-    } finally {
-      if (approvedCode !== null) await revokeKeyNamed(keyName);
+    const grade = await checkCodeTask(task, trace, paths, approvedCode);
+    if (approvedCode !== null) {
+      // A key left behind is cleaned by hand; it must not lose the graded run
+      try {
+        await revokeKeyNamed(keyName);
+      } catch (error) {
+        console.log(
+          `could not revoke "${keyName}": ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
+    return { trace, grade, extraUsages: [], kvWrites: SUITE_B_KV_WRITES };
   },
 }));
 
@@ -195,7 +205,9 @@ async function main(): Promise<void> {
           client,
           arm,
         );
-        const metrics = metricsOf(trace, extraUsages);
+        const metrics = metricsOf(trace, extraUsages, {
+          personInChat: job.personInChat,
+        });
         if (kvWrites !== undefined) metrics.kvWrites = kvWrites;
         if (KV_BUDGET_APPLIES) await addKvWrites(metrics.kvWrites);
         const row: ResultRow = {

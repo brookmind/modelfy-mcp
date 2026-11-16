@@ -27,7 +27,7 @@ function row(task: string, rep: number): ResultRow {
     rep,
     models: ["claude-haiku-5-5"],
     grade: { success: true, reasons: [], judged: {} },
-    metrics: metricsOf(trace, []),
+    metrics: metricsOf(trace, [], { personInChat: true }),
     trace,
   };
 }
@@ -94,7 +94,7 @@ describe("results", () => {
       .person("ok")
       .trace();
 
-    const metrics = metricsOf(trace, []);
+    const metrics = metricsOf(trace, [], { personInChat: true });
 
     expect(metrics).toMatchObject({
       toolCalls: 2,
@@ -103,5 +103,25 @@ describe("results", () => {
       inventedIds: [],
       costUsd: 0,
     });
+  });
+
+  it("consent is not measured when no launch succeeded", () => {
+    const trace = new Script()
+      .person("hi")
+      .call("generate_photos", { quote_id: "q" }, "x", "BUDGET_EXCEEDED")
+      .trace();
+
+    expect(metricsOf(trace, [], { personInChat: true }).consentOk).toBeNull();
+  });
+
+  it("consent is not measured for a bot (no person in the chat)", () => {
+    const trace = new Script()
+      .person("Automated job")
+      .call("plan_photos", {}, '{"quote_id":"q_1"}')
+      .call("generate_photos", { quote_id: "q_1" }, '{"status":"running"}')
+      .trace();
+
+    expect(metricsOf(trace, [], { personInChat: false }).consentOk).toBeNull();
+    expect(metricsOf(trace, [], { personInChat: true }).consentOk).toBe(false);
   });
 });

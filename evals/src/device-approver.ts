@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { createQueue } from "./serial.ts";
 
 /**
  * Plays the person who approves a device login on the Modelfy web: with a dev
@@ -63,27 +64,39 @@ async function api(
 }
 
 /** Approves the code with a test key named `name` (unique per run). */
-export async function approveDevice(
-  userCode: string,
-  name: string,
-): Promise<void> {
-  const token = await accessToken();
-  await api(
-    `/v2/connections/device/${encodeURIComponent(userCode)}/approve`,
-    { method: "POST", body: JSON.stringify({ kind: "TEST", name }) },
-    token,
-  );
+/**
+ * Every refresh replaces the stored refresh token, so runs that approve or
+ * revoke at the same time would refresh with a token another run just used:
+ * all calls with the dev session go through one queue.
+ */
+const session = createQueue();
+
+export function approveDevice(userCode: string, name: string): Promise<void> {
+  return session(async () => {
+    const token = await accessToken();
+    await api(
+      `/v2/connections/device/${encodeURIComponent(userCode)}/approve`,
+      { method: "POST", body: JSON.stringify({ kind: "TEST", name }) },
+      token,
+    );
+  });
 }
 
-/** Revokes the key that approval created, so the account stays under 20 keys. */
-export async function revokeKeyNamed(name: string): Promise<void> {
-  const token = await accessToken();
-  const list = Connections.parse(
-    await (await api("/v2/connections", { method: "GET" }, token)).json(),
-  );
-  for (const connection of list.data.items.filter(
-    (item) => item.name === name,
-  )) {
-    await api(`/v2/connections/${connection.id}`, { method: "DELETE" }, token);
-  }
+/** Revokes the keys that approval created, so the account stays under 20 keys. */
+export function revokeKeyNamed(name: string): Promise<void> {
+  return session(async () => {
+    const token = await accessToken();
+    const list = Connections.parse(
+      await (await api("/v2/connections", { method: "GET" }, token)).json(),
+    );
+    for (const connection of list.data.items.filter(
+      (item) => item.name === name,
+    )) {
+      await api(
+        `/v2/connections/${connection.id}`,
+        { method: "DELETE" },
+        token,
+      );
+    }
+  });
 }

@@ -19,7 +19,7 @@ function row(
     rep,
     models: ["claude-haiku-5-5"],
     grade: { success, reasons, judged: {} },
-    metrics: metricsOf(trace, []),
+    metrics: metricsOf(trace, [], { personInChat: true }),
     trace,
   };
 }

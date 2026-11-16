@@ -26,6 +26,19 @@ export function findUserCode(text: string): string | null {
 }
 
 /**
+ * The code the person approves now: one the agent showed them in its own
+ * words (a code only in a command's output was never shown), not tried yet.
+ */
+export function codeToApprove(
+  event: TraceEvent,
+  tried: ReadonlySet<string>,
+): string | null {
+  if (event.kind !== "agent_text") return null;
+  const code = findUserCode(event.text);
+  return code !== null && !tried.has(code) ? code : null;
+}
+
+/**
  * The person says "I approved it" once, and only while the agent still waits
  * for the key: an agent that already saved it would take the message as a
  * new request.
@@ -44,6 +57,9 @@ export interface SandboxPaths {
   /** This run's folder (read-write inside, at /work) */
   runDir: string;
 }
+
+/** The parts of the evals package the agent's process needs to run. */
+const HARNESS_PARTS = ["src", "node_modules", "package.json", "tsconfig.json"];
 
 /** From /etc, only what DNS, TLS and user lookups need. */
 const ETC_FILES = [
@@ -80,9 +96,13 @@ export function bwrapArgs(paths: SandboxPaths): string[] {
     "--symlink",
     "usr/sbin",
     "/sbin",
-    "--ro-bind",
-    paths.harness,
-    "/harness",
+    // Only what the agent's process runs: never .secrets (the dev session),
+    // runs (other runs' keys and answers) or results (graded traces)
+    ...HARNESS_PARTS.flatMap((part) => [
+      "--ro-bind",
+      `${paths.harness}/${part}`,
+      `/harness/${part}`,
+    ]),
     "--bind",
     paths.runDir,
     "/work",
@@ -168,7 +188,8 @@ export async function runCoder(
 
   let approvedCode: string | null = null;
   const tried = new Set<string>();
-  let toldApproved = false;
+  // An approval the agent has not been told about yet
+  let untold = false;
   for await (const line of createInterface({ input: child.stdout })) {
     let parsed: z.infer<typeof EventSchema>;
     try {
@@ -179,36 +200,29 @@ export async function runCoder(
     if (parsed.kind === "turn_end") {
       trace.stopReason = parsed.stopReason;
       const tell = shouldTellApproved({
-        approved: approvedCode !== null,
-        alreadyTold: toldApproved,
+        approved: untold,
+        alreadyTold: false,
         keySaved: (await savedKey(paths.runDir)) !== null,
       });
-      toldApproved ||= tell;
+      untold = false;
       child.stdin.write(tell ? `continue ${APPROVED_MESSAGE}\n` : "stop\n");
       continue;
     }
     const event: TraceEvent = parsed;
     trace.events.push(event);
-    if (
-      approvedCode === null &&
-      (event.kind === "agent_text" || event.kind === "tool_result")
-    ) {
-      const code = findUserCode(event.text);
-      // Each code is tried once, as a person would
-      if (code !== null && !tried.has(code)) {
-        tried.add(code);
-        try {
-          await approve(code);
-          approvedCode = code;
-        } catch (error) {
-          // The person could not approve (wrong code, no dev session): the run
-          // goes on, and its grade shows that nothing was approved
-          approvedCode = null;
-          console.log(
-            `could not approve ${code}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
+    const code = codeToApprove(event, tried);
+    if (code === null) continue;
+    tried.add(code);
+    try {
+      await approve(code);
+      approvedCode = code;
+      untold = true;
+    } catch (error) {
+      // The person could not approve (wrong code, no dev session): the run
+      // goes on, and its grade shows what was approved
+      console.log(
+        `could not approve ${code}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
   clearTimeout(timer);

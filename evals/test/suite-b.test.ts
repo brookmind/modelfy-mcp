@@ -2,9 +2,11 @@ import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
   bwrapArgs,
+  codeToApprove,
   findUserCode,
   shouldTellApproved,
 } from "../src/agents/coder.ts";
+import type { TraceEvent } from "../src/trace.ts";
 import { redact } from "../src/results.ts";
 import { deviceLoginReasons } from "../src/tasks/suite-b.ts";
 import { Script } from "./script.ts";
@@ -38,6 +40,45 @@ describe("findUserCode", () => {
     expect(findUserCode('{"user_code":"PQRS-TVWX","interval":5}')).toBe(
       "PQRS-TVWX",
     );
+  });
+});
+
+describe("which device code the person approves", () => {
+  const shown = (text: string): TraceEvent => ({
+    kind: "agent_text",
+    text,
+    at: 0,
+  });
+
+  it("approves a code the agent shows the person", () => {
+    expect(
+      codeToApprove(shown("Open /activate and enter PQRS-TVWX"), new Set()),
+    ).toBe("PQRS-TVWX");
+  });
+
+  it("does not approve a code that only appears in a command's output", () => {
+    const output: TraceEvent = {
+      kind: "tool_result",
+      id: "t1",
+      tool: "Bash",
+      isError: false,
+      code: null,
+      text: '{"user_code":"PQRS-TVWX","verification_uri":"…/activate"}',
+      at: 0,
+    };
+
+    expect(codeToApprove(output, new Set())).toBeNull();
+  });
+
+  it("approves a later, new code but never the same one twice", () => {
+    const tried = new Set(["PQRS-TVWX"]);
+
+    expect(
+      codeToApprove(shown("Approve PQRS-TVWX at /activate"), tried),
+    ).toBeNull();
+    expect(
+      codeToApprove(shown("New code: KLMN-BCDF at /activate"), tried),
+    ).toBe("KLMN-BCDF");
   });
 });
 
@@ -143,7 +184,32 @@ describe("the sandbox around the coding agent", () => {
     expect(args).toContain("--unshare-all");
     expect(args).toContain("--share-net");
     expect(args.join(" ")).toContain(`--bind ${runDir} /work`);
-    expect(args.join(" ")).toContain(`--ro-bind ${harness} /harness`);
+  });
+
+  it("mounts only the code the agent runs, never secrets, runs or results", () => {
+    const args = bwrapArgs({
+      harness: "/srv/evals",
+      runDir: "/srv/evals/runs/abc",
+    });
+    const bound = args.flatMap((arg, index) =>
+      ["--bind", "--ro-bind"].includes(args[index - 1] ?? "") ? [arg] : [],
+    );
+
+    expect(bound).not.toContain("/srv/evals");
+    expect(bound).toEqual(
+      expect.arrayContaining([
+        "/srv/evals/src",
+        "/srv/evals/node_modules",
+        "/srv/evals/package.json",
+      ]),
+    );
+    expect(
+      bound.filter((path) =>
+        ["/.secrets", "/results", "/runs/"].some(
+          (part) => path.includes(part) && path !== "/srv/evals/runs/abc",
+        ),
+      ),
+    ).toEqual([]);
   });
 });
 

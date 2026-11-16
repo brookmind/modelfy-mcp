@@ -31,7 +31,9 @@ async function regrade(client: Anthropic, runId: string): Promise<void> {
     const grade = await task.check(row.trace, makeJudge(client, judgeUsages));
     if (grade.success !== row.grade.success) changed += 1;
     row.grade = grade;
-    row.metrics = metricsOf(row.trace, judgeUsages);
+    row.metrics = metricsOf(row.trace, judgeUsages, {
+      personInChat: task.actsAs === "person",
+    });
   }
   const temporary = `${path}.tmp`;
   await writeFile(

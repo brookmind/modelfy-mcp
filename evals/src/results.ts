@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import {
   callsOf,
   consentOk,
+  succeeded,
   costUsd,
   estimateKvWrites,
   inventedIds,
@@ -92,7 +93,19 @@ export function rowKey(task: string, arm: AgentLayer, rep: number): string {
   return `${task}|${arm}|${rep}`;
 }
 
-export function metricsOf(trace: Trace, extraUsages: Usage[]): Metrics {
+export interface MetricsContext {
+  /** A person in the chat must say yes to the price (not a bot or code) */
+  personInChat: boolean;
+}
+
+export function metricsOf(
+  trace: Trace,
+  extraUsages: Usage[],
+  context: MetricsContext,
+): Metrics {
+  const launched = callsOf(trace, "generate_photos").some((call) =>
+    succeeded(trace, call),
+  );
   const usages = [
     ...trace.events.filter((event): event is Usage => event.kind === "usage"),
     ...extraUsages,
@@ -108,8 +121,8 @@ export function metricsOf(trace: Trace, extraUsages: Usage[]): Metrics {
       trace.events.filter((event) => event.kind === "person_text").length - 1,
     ),
     inventedIds: inventedIds(trace),
-    consentOk:
-      callsOf(trace, "generate_photos").length === 0 ? null : consentOk(trace),
+    // Measured only where it means something: a person, and a real launch
+    consentOk: context.personInChat && launched ? consentOk(trace) : null,
     seconds: (trace.endedAt - trace.startedAt) / 1000,
     costUsd: costUsd(usages),
     tokens: {
