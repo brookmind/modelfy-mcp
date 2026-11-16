@@ -3,7 +3,7 @@ import type { GrantProps } from "../auth/props";
 import { randomBase64Url } from "../crypto";
 import { AgentError } from "../mcp/errors";
 import { ApiBackend } from "./api-backend";
-import { safeImageFetch } from "./download";
+import { checkImageLink } from "./download";
 import { previewBody } from "./plan-body";
 import {
   demoImage,
@@ -240,7 +240,7 @@ export class SandboxBackend implements PhotoBackend {
         continue;
       }
       try {
-        await safeImageFetch(url);
+        await checkImageLink(url);
         added.push({
           source_url: url,
           upload_id: `sbx_${randomBase64Url(12)}`,

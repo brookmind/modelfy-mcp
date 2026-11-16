@@ -85,13 +85,20 @@ async function readCapped(
   return bytes;
 }
 
+interface OpenedImage {
+  contentType: string;
+  response: Response;
+}
+
 /**
- * Downloads a product photo from a public link, safely: every redirect hop is
- * checked again, images only, at most 15 MB, 20 s in all.
+ * Follows a public link to an accepted image and stops at its headers: every
+ * redirect hop is checked again. The body is still unread.
  */
-export async function safeImageFetch(raw: string): Promise<DownloadedImage> {
+async function openImage(
+  raw: string,
+  signal: AbortSignal,
+): Promise<OpenedImage> {
   let url = checkUrl(raw);
-  const signal = AbortSignal.timeout(TIMEOUT_MS);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     let response: Response;
     try {
@@ -118,7 +125,30 @@ export async function safeImageFetch(raw: string): Promise<DownloadedImage> {
     if (!ACCEPTED_TYPES.has(contentType)) {
       throw rejected(raw, "not a jpg, png, webp or heic image");
     }
-    return { contentType, bytes: await readCapped(response, raw) };
+    return { contentType, response };
   }
   throw rejected(raw, "too many redirects");
+}
+
+/**
+ * Downloads a product photo from a public link, safely: images only, at most
+ * 15 MB, 20 s in all.
+ */
+export async function safeImageFetch(raw: string): Promise<DownloadedImage> {
+  const { contentType, response } = await openImage(
+    raw,
+    AbortSignal.timeout(TIMEOUT_MS),
+  );
+  return { contentType, bytes: await readCapped(response, raw) };
+}
+
+/**
+ * The same checks as `safeImageFetch` without downloading the photo: the
+ * sandbox keeps no bytes, so it reads the headers and drops the body.
+ */
+export async function checkImageLink(raw: string): Promise<void> {
+  const { response } = await openImage(raw, AbortSignal.timeout(TIMEOUT_MS));
+  const declared = Number(response.headers.get("Content-Length") ?? "0");
+  await response.body?.cancel();
+  if (declared > MAX_BYTES) throw rejected(raw, "larger than 15 MB");
 }

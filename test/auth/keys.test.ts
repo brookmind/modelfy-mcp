@@ -6,6 +6,7 @@ import {
   createSandboxKey,
   sandboxKeysPerHour,
 } from "../../src/auth/sandbox-keys";
+import { limitAddress } from "../../src/limits";
 import { call, connect, json, mockApi } from "../helpers/worker";
 
 const LIVE = `mfy_live_${"L".repeat(43)}`;
@@ -130,6 +131,37 @@ describe("anonymous sandbox keys", () => {
 
     expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
     expect((await sandboxKey("203.0.113.10")).status).toBe(200);
+  });
+
+  it("IPv6 addresses of one /64 share the sandbox key limit", async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      statuses.push((await sandboxKey(`2001:db8:7:9::${i + 1}`)).status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+    expect((await sandboxKey("2001:db8:7:a::1")).status).toBe(200);
+  });
+
+  it("sandbox key requests fired at once cannot all pass the hourly counter", async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 30 }, () => sandboxKey("203.0.113.77")),
+    );
+
+    const created = responses.filter((response) => response.status === 200);
+    // The per-minute limit (10) holds even when the KV counter is raced
+    expect(created.length).toBeLessThanOrEqual(10);
+    expect(created.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["198.51.100.7", "198.51.100.7"],
+    ["2001:db8:7:9::1", "2001:db8:7:9::/64"],
+    ["2001:0DB8:0007:0009:ffff:ffff:ffff:ffff", "2001:db8:7:9::/64"],
+    ["2001:db8::1", "2001:db8:0:0::/64"],
+    ["::1", "0:0:0:0::/64"],
+  ])("limits count %s as %s", (ip, counted) => {
+    expect(limitAddress(ip)).toBe(counted);
   });
 });
 

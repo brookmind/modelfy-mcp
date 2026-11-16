@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { safeImageFetch } from "../../src/backend/download";
+import { checkImageLink, safeImageFetch } from "../../src/backend/download";
 import { connect, json, mockApi, type ApiCall } from "../helpers/worker";
 
 const LIVE = `mfy_live_${"L".repeat(43)}`;
@@ -172,6 +172,49 @@ describe("safeImageFetch", () => {
     await expect(
       safeImageFetch("https://shop.test/huge.png"),
     ).rejects.toMatchObject({ code: "PHOTO_REJECTED" });
+  });
+});
+
+describe("checkImageLink", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts an image from its headers, without reading the body", async () => {
+    mockApi(uploadsApi, imageHost);
+
+    // 20 MB with no declared length: reading it would be refused
+    await expect(
+      checkImageLink("https://shop.test/huge.png"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("refuses a declared length past 15 MB", async () => {
+    mockApi(
+      uploadsApi,
+      () =>
+        new Response("x", {
+          headers: {
+            "Content-Type": "image/png",
+            "Content-Length": String(16 * 1024 * 1024),
+          },
+        }),
+    );
+
+    await expect(
+      checkImageLink("https://shop.test/big.png"),
+    ).rejects.toMatchObject({ code: "PHOTO_REJECTED" });
+  });
+
+  it.each([
+    ["a page that is not an image", "https://shop.test/page.html"],
+    ["a redirect to a private address", "https://shop.test/to-local"],
+  ])("refuses %s", async (_label, url) => {
+    mockApi(uploadsApi, imageHost);
+
+    await expect(checkImageLink(url)).rejects.toMatchObject({
+      code: "PHOTO_REJECTED",
+    });
   });
 });
 

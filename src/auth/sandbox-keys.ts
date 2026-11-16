@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { randomBase62, randomBase64Url, sha256Hex } from "../crypto";
-import { clientIp, hourlyLimit } from "../limits";
+import { keyRequestAllowed } from "../limits";
 import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -101,9 +101,10 @@ export async function createSandboxKey(
     return invalidRequest('agent_layer "bare" is not available here.');
   }
   const perHour = sandboxKeysPerHour(env.SANDBOX_KEYS_PER_HOUR);
-  const allowed = await hourlyLimit(
-    env.OAUTH_KV,
-    `sandbox-keys:${clientIp(request)}`,
+  const allowed = await keyRequestAllowed(
+    env,
+    request,
+    "sandbox-keys",
     perHour,
   );
   if (!allowed) {
