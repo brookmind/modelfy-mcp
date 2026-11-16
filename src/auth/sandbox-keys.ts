@@ -5,7 +5,8 @@ import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_KEYS_PER_IP_PER_HOUR = 5;
-const DEFAULT_KEYS_PER_DAY = 100;
+/** All addresses together get this many times one address's hourly keys in a UTC day */
+const DAILY_TOTAL_FACTOR = 20;
 
 /** The budget of a sandbox key that acts as a bot: a new live key's defaults */
 export const SANDBOX_BOT_BUDGET = {
@@ -122,7 +123,7 @@ export async function createSandboxKey(
     );
   }
   // All addresses together: free keys cannot use up the storage sign-ins need
-  const perDay = limitSetting(env.SANDBOX_KEYS_PER_DAY, DEFAULT_KEYS_PER_DAY);
+  const perDay = perHour * DAILY_TOTAL_FACTOR;
   if (!(await windowLimit(env.OAUTH_KV, "sandbox-keys-all", perDay, DAY_MS))) {
     return tooMany(
       "No more free sandbox keys today (the daily total resets at 00:00 UTC). Reuse a key you have, or get your own with device login (POST /device/code).",
