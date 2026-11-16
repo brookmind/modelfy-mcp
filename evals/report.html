@@ -715,11 +715,38 @@
 
       <section class="figure" aria-labelledby="spread-h">
         <div class="stack" style="gap: 8px">
-          <h2 id="spread-h">What each run took</h2>
+          <h2 id="spread-h">Cost and time</h2>
           <p class="chart-sub read">
-            Every dot is one run; the dark tick is the median. v1 costs a little
-            more per run, mostly because the budget runs now do the job: four
-            plans and four launches instead of one plan and a stop.
+            A failed run is paid for too and leaves the job undone, so what a
+            version really costs is its total divided by the runs that passed.
+            Per successful run, v1 is the cheapest and the fastest.
+          </p>
+        </div>
+        <div class="charts even">
+          <div class="chart">
+            <div class="chart-title">Cost per successful run</div>
+            <div class="chart-sub">
+              All runs' cost (agent, simulated owner and judge) divided by the
+              runs that passed
+            </div>
+            <svg id="success-cost" viewBox="0 0 400 128" role="img"></svg>
+          </div>
+          <div class="chart">
+            <div class="chart-title">Time per successful run</div>
+            <div class="chart-sub">
+              All runs' seconds divided by the runs that passed
+            </div>
+            <svg id="success-seconds" viewBox="0 0 400 128" role="img"></svg>
+          </div>
+        </div>
+        <div class="stack" style="gap: 8px">
+          <div class="chart-title">Per run, passed or failed</div>
+          <p class="chart-sub read">
+            Every dot is one run; the dark tick is the median. Per run, v1 costs
+            a little more and takes about as long as v0: the budget runs (the
+            dots far right) now do the job, four plans and four launches instead
+            of one plan and a stop. bare is quick and cheap because it skips
+            steps, which is why most of its dots are hollow.
           </p>
           <div class="legend">
             <span><i class="ring full"></i>passed</span
@@ -3299,6 +3326,87 @@
         strip("strip-cost", "cost", 0.014, [0, 0.005, 0.01], function (v) {
           return "$" + (v === 0 ? "0" : v.toFixed(4).replace(/0$/, ""));
         });
+
+        // Per successful run: a version's total over the runs that passed
+        function perSuccess(id, key, format, what) {
+          var svg = document.getElementById(id);
+          var x0 = 44,
+            w = 270;
+          var values = {};
+          ARMS.forEach(function (arm) {
+            var total = RUNS[arm].reduce(function (sum, r) {
+              return sum + r[key];
+            }, 0);
+            values[arm] = total / stats[arm].passed;
+          });
+          var max = Math.max.apply(
+            null,
+            ARMS.map(function (a) {
+              return values[a];
+            }),
+          );
+          ARMS.forEach(function (arm, i) {
+            var yTop = 10 + i * 38,
+              v = values[arm];
+            svgEl("text", { class: "armlabel", x: 0, y: yTop + 15 }, svg, arm);
+            var g = svgEl(
+              "g",
+              {
+                tabindex: 0,
+                "data-tip":
+                  arm +
+                  ": " +
+                  format(v) +
+                  " " +
+                  what +
+                  " per successful run (" +
+                  stats[arm].passed +
+                  " of " +
+                  stats[arm].n +
+                  " passed)",
+              },
+              svg,
+            );
+            svgEl(
+              "path",
+              {
+                d: rightBar(x0, yTop, Math.max(1, (v / max) * w), 22),
+                fill: armColor(arm),
+              },
+              g,
+            );
+            svgEl(
+              "text",
+              { class: "val", x: x0 + (v / max) * w + 8, y: yTop + 15 },
+              g,
+              format(v),
+            );
+          });
+          svg.setAttribute(
+            "aria-label",
+            what +
+              " per successful run: " +
+              ARMS.map(function (a) {
+                return a + " " + format(values[a]);
+              }).join(", "),
+          );
+        }
+        perSuccess(
+          "success-cost",
+          "cost",
+          function (v) {
+            return "$" + v.toFixed(4);
+          },
+          "cost",
+        );
+        perSuccess(
+          "success-seconds",
+          "seconds",
+          function (v) {
+            return v.toFixed(1) + " s";
+          },
+          "time",
+        );
 
         // Tool errors by code
         (function () {
