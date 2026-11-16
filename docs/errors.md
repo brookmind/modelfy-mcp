@@ -13,7 +13,7 @@ A tool that fails returns `isError: true` with one sentence for the model and th
   "error": {
     "code": "BUDGET_EXCEEDED",
     "message": "This launch would go over the key's daily budget.",
-    "next_step": "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.",
+    "next_step": "Over the budget per photo session: plan smaller sessions (fewer photos or products each) and launch them one at a time. Over the daily budget: wait until it resets (budget.resetsAt) or ask the key's owner to raise it.",
     "docs_url": "https://mcp.modelfy.ai/docs/errors#BUDGET_EXCEEDED"
   }
 }
@@ -33,7 +33,7 @@ The account does not have enough credits. Tell the person; they can buy credits 
 
 ### BUDGET_EXCEEDED
 
-The launch would go over the live key's budget per session or per day. Nothing was spent. The error includes `budget`. Plan fewer photos, wait until the daily budget resets (`budget.resetsAt` in `get_account`), or ask the key's owner to raise its budget in the Modelfy web. See [Credits and consent](credits.md).
+The launch would go over the live key's budget per session or per day. Nothing was spent. The error includes `budget` (`limit` says which one). Over the budget per session, the job still fits: plan smaller sessions (fewer photos or products each, within `budget.maxCreditsPerSession`) and launch them one at a time; `plan_photos` already says how many photos fit in one session. Over the daily budget: wait until it resets (`budget.resetsAt`), or ask the key's owner to raise it in the Modelfy web. See [Credits and consent](credits.md).
 
 ### QUOTE_EXPIRED
 

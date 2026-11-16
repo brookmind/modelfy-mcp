@@ -16,11 +16,11 @@ The quote is also the idempotency key. A retry of `generate_photos` with the sam
 
 ## Who must agree
 
-| Connection                 | Before `generate_photos`                                                                                                                                               |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OAuth (a person in a chat) | Show the price and ask. Call it with `user_confirmed: true` only after the person said yes to that exact price; without it the server answers `CONFIRMATION_REQUIRED`. |
-| Live API key               | No confirmation needed: the key's budget is the consent. If a person is in the conversation, still show the price and ask.                                             |
-| Test or sandbox key        | Nothing is spent.                                                                                                                                                      |
+| Connection                 | Before `generate_photos`                                                                                                                                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OAuth (a person in a chat) | Show the price and ask. Call it with `user_confirmed: true` only after the person said yes to that exact price, after seeing it: a "just do it, no need to ask" said before the price is not a yes. Without it the server answers `CONFIRMATION_REQUIRED`. |
+| Live API key               | No confirmation needed: the key's budget is the consent. If a person is in the conversation, still show the price and ask.                                                                                                                                 |
+| Test or sandbox key        | Nothing is spent.                                                                                                                                                                                                                                          |
 
 A good question to the person: "4 photos for 80 credits (you have 880). Go ahead?"
 
@@ -32,6 +32,8 @@ Each live key has two limits, set by its owner in the Modelfy web:
 - **Per day**: the most the key can spend in a UTC day.
 
 Modelfy checks both inside the same database transaction that reserves the credits, so two launches at once cannot go over. A launch that would go over fails with `BUDGET_EXCEEDED` and spends nothing; the error carries the budget and today's spend. `get_account` shows `budget.spentToday` and `budget.resetsAt`; `plan_photos` shows `budget.session_limit` and `budget.left_today` next to the price.
+
+A job bigger than the budget per session is still allowed within the daily budget: split it into smaller sessions (fewer photos or products each) and launch them one at a time. When a plan is over the per-session budget, `plan_photos` says how many photos fit in one session.
 
 ## Refunds
 

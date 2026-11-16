@@ -62,8 +62,13 @@ export async function startDevice(
     DEVICE_CODES_PER_IP_PER_HOUR,
   );
   if (wait > 0) {
+    // Not "slow_down": that is a polling error (RFC 8628 §3.5), and agents
+    // that got it here kept retrying at once
     return Response.json(
-      { error: "slow_down" },
+      {
+        error: "rate_limited",
+        error_description: `Too many device codes from this address. Wait ${wait} seconds (Retry-After) before starting a device login again; retrying sooner fails the same way.`,
+      },
       { status: 429, headers: { ...NO_STORE, "Retry-After": String(wait) } },
     );
   }
