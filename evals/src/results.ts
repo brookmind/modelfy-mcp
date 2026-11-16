@@ -8,9 +8,10 @@ import {
   inventedIds,
   toolErrors,
 } from "./grade/checks.ts";
+import { z } from "zod";
 import type { AgentLayer } from "./sandbox-key.ts";
 import type { Grade } from "./tasks/types.ts";
-import type { Trace, Usage } from "./trace.ts";
+import { TraceSchema, type Trace, type Usage } from "./trace.ts";
 
 export interface Metrics {
   toolCalls: number;
@@ -43,6 +44,38 @@ export interface ResultRow {
   metrics: Metrics;
   trace: Trace;
 }
+
+/** Reads a result row back from results.jsonl. */
+export const ResultRowSchema = z.object({
+  runId: z.string(),
+  task: z.string(),
+  suite: z.enum(["a", "b"]),
+  arm: z.enum(["v0", "bare"]),
+  rep: z.number(),
+  models: z.array(z.string()),
+  grade: z.object({
+    success: z.boolean(),
+    reasons: z.array(z.string()),
+    judged: z.record(z.string(), z.boolean()),
+  }),
+  metrics: z.object({
+    toolCalls: z.number(),
+    toolErrors: z.record(z.string(), z.number()),
+    personTurns: z.number(),
+    inventedIds: z.array(z.string()),
+    consentOk: z.boolean().nullable(),
+    seconds: z.number(),
+    costUsd: z.number(),
+    tokens: z.object({
+      input: z.number(),
+      output: z.number(),
+      cacheRead: z.number(),
+      cacheWrite: z.number(),
+    }),
+    kvWrites: z.number(),
+  }),
+  trace: TraceSchema,
+});
 
 const KEY_PATTERN = /mfy_(test|live)_[0-9A-Za-z]{20,}/g;
 /** The coding agent can read its own environment: never keep that key */

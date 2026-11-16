@@ -3,39 +3,13 @@
 // each and evals/REPORT.md for all the given runs together.
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { z } from "zod";
 import { renderReport, summarize, type ReportRow } from "./report.ts";
+import { ResultRowSchema } from "./results.ts";
 
 const EVALS_DIR = join(import.meta.dirname, "..");
 
-const RowSchema = z.object({
-  task: z.string(),
-  suite: z.enum(["a", "b"]),
-  arm: z.enum(["v0", "bare"]),
-  rep: z.number(),
-  models: z.array(z.string()),
-  grade: z.object({
-    success: z.boolean(),
-    reasons: z.array(z.string()),
-    judged: z.record(z.string(), z.boolean()),
-  }),
-  metrics: z.object({
-    toolCalls: z.number(),
-    toolErrors: z.record(z.string(), z.number()),
-    personTurns: z.number(),
-    inventedIds: z.array(z.string()),
-    consentOk: z.boolean().nullable(),
-    seconds: z.number(),
-    costUsd: z.number(),
-    tokens: z.object({
-      input: z.number(),
-      output: z.number(),
-      cacheRead: z.number(),
-      cacheWrite: z.number(),
-    }),
-    kvWrites: z.number(),
-  }),
-});
+// The report never needs the traces
+const RowSchema = ResultRowSchema.omit({ trace: true, runId: true });
 
 async function rowsOf(runId: string): Promise<ReportRow[]> {
   const text = await readFile(
@@ -67,8 +41,5 @@ for (const runId of runIds) {
     `${JSON.stringify(summarize(rows), null, 2)}\n`,
   );
 }
-await writeFile(
-  join(EVALS_DIR, "REPORT.md"),
-  renderReport(summarize(all), runIds),
-);
+await writeFile(join(EVALS_DIR, "REPORT.md"), renderReport(all, runIds));
 console.log(`REPORT.md from ${all.length} runs`);

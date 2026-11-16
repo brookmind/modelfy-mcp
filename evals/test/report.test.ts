@@ -67,10 +67,7 @@ describe("summarize", () => {
 describe("renderReport", () => {
   it("puts the arms as columns in the order bare, v0", () => {
     const markdown = renderReport(
-      summarize([
-        row("says-no", "v0", 0, true),
-        row("says-no", "bare", 0, false),
-      ]),
+      [row("says-no", "v0", 0, true), row("says-no", "bare", 0, false)],
       ["r1"],
     );
     const header = markdown
@@ -80,10 +77,35 @@ describe("renderReport", () => {
     expect(header).toBe("| Metric | bare | v0 |");
   });
 
+  it("compares the arms on the chat suite only and shows the coding agent apart", () => {
+    const coding: ResultRow = {
+      ...row("node-script", "v0", 0, true),
+      suite: "b",
+    };
+    const markdown = renderReport(
+      [
+        row("says-no", "v0", 0, false),
+        row("says-no", "bare", 0, false),
+        coding,
+      ],
+      ["r1"],
+    );
+    const chat = markdown.slice(
+      markdown.indexOf("## Chat assistant"),
+      markdown.indexOf("## Coding agent"),
+    );
+
+    expect(chat).toContain(
+      "| Task success (95% interval) | 0% (0%–79%) | 0% (0%–79%) |",
+    );
+    expect(markdown).toContain("## Coding agent");
+    expect(markdown.slice(markdown.indexOf("## Coding agent"))).toContain(
+      "| Task success (95% interval) | 100%",
+    );
+  });
+
   it("states the noise level and the models", () => {
-    const markdown = renderReport(summarize([row("says-no", "v0", 0, true)]), [
-      "r1",
-    ]);
+    const markdown = renderReport([row("says-no", "v0", 0, true)], ["r1"]);
 
     expect(markdown).toContain("95%");
     expect(markdown).toContain("claude-haiku-5-5");

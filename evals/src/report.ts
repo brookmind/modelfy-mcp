@@ -157,7 +157,9 @@ function table(header: string[], lines: string[][]): string {
   ].join("\n");
 }
 
-export function renderReport(summary: Summary, runIds: string[]): string {
+/** One suite's headline, per-task table and failure reasons, as Markdown. */
+function renderSuite(summary: Summary): string {
+  if (summary.arms.length === 0) return "No runs.";
   const arms = summary.arms;
   const metric = (
     name: string,
@@ -188,13 +190,10 @@ export function renderReport(summary: Summary, runIds: string[]): string {
 
   const taskIds = [...new Set(summary.tasks.map((task) => task.task))];
   const perTask = table(
-    ["Task", "Suite", ...arms.map((arm) => arm.arm)],
+    ["Task", ...arms.map((arm) => arm.arm)],
     taskIds.map((id) => {
-      const suite =
-        summary.tasks.find((task) => task.task === id)?.suite ?? "a";
       return [
         id,
-        suite.toUpperCase(),
         ...arms.map((arm) => {
           const found = summary.tasks.find(
             (task) => task.task === id && task.arm === arm.arm,
@@ -217,28 +216,48 @@ export function renderReport(summary: Summary, runIds: string[]): string {
           ]),
         );
 
-  return `# Agent evals: results
+  return `${headline}
 
-Runs: ${runIds.map((id) => `\`${id}\``).join(", ")}. Models: ${summary.models.join(", ")}. Server: the Modelfy MCP sandbox on mcp-dev (nothing is spent). How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
-
-Arms: **bare** is the same server with no agent-facing text (no instructions, one-line tool descriptions, no schema descriptions, no guidance in results or errors, no docs); **v0** is the server as shipped before tuning; **v1** is after tuning.
-
-## Headline
-
-${headline}
-
-## Per task (passes / runs)
+Per task (passes / runs):
 
 ${perTask}
 
-## Why runs failed
+Why runs failed:
 
-${reasons}
+${reasons}`;
+}
+
+/**
+ * The report: the arms compared on the chat suite (the only one with a bare
+ * arm), and the coding agent on its own, so suites never mix in a number.
+ */
+export function renderReport(rows: ReportRow[], runIds: string[]): string {
+  const chat = summarize(rows.filter((row) => row.suite === "a"));
+  const coding = summarize(rows.filter((row) => row.suite === "b"));
+  const models = summarize(rows).models;
+  const runsPerArm = chat.arms[0]?.runs ?? 0;
+  return `# Agent evals: results
+
+Runs: ${runIds.map((id) => `\`${id}\``).join(", ")}. Models: ${models.join(", ")}. Server: the Modelfy MCP sandbox on mcp-dev (nothing is spent). How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
+
+Arms: **bare** is the same server with no agent-facing text (no instructions, one-line tool descriptions, no schema descriptions, no guidance in results or errors, no docs); **v0** is the server as shipped before tuning; **v1** is after tuning.
+
+## Chat assistant (suite A)
+
+Claude API with the Modelfy MCP connector; a simulated store owner answers.
+
+${renderSuite(chat)}
+
+## Coding agent (suite B)
+
+Claude Agent SDK in an empty folder with no key: it finds the docs, gets a key and builds the integration.
+
+${renderSuite(coding)}
 
 ## How to read this
 
 - A task passes only when every check in its row of DESIGN.md holds; a pass on a retry counts as a failure.
-- With about ${arms[0]?.runs ?? 0} runs per arm the 95% interval of the success rate is wide: differences smaller than about 15 points are noise.
+- With about ${runsPerArm} runs per arm the 95% interval of the success rate is wide: differences smaller than about 15 points are noise.
 - "Asked before spending" counts runs with a person in the chat that launched a session: the launch came after the person's yes to the price shown.
 - Costs include the agent, the simulated person and the judge, at list prices.
 `;

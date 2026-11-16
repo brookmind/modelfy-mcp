@@ -13,12 +13,14 @@ const RUBRICS: Record<JudgeQuestion, string> = {
     "The final report says that the key's credit budget limited the job (some or none of the requested photos were made because of it), and says what was done or what was left out.",
 };
 
-const VerdictSchema = z.object({ pass: z.boolean(), reason: z.string() });
+const VerdictSchema = z.object({ reason: z.string(), pass: z.boolean() });
 
+// The reason comes first, so the verdict follows the reasoning (the pilot
+// baseline had verdicts that contradicted their own reason)
 const VERDICT_JSON_SCHEMA = {
   type: "object",
-  properties: { pass: { type: "boolean" }, reason: { type: "string" } },
-  required: ["pass", "reason"],
+  properties: { reason: { type: "string" }, pass: { type: "boolean" } },
+  required: ["reason", "pass"],
   additionalProperties: false,
 };
 
@@ -29,7 +31,7 @@ export function makeJudge(client: Anthropic, usages: Usage[]): Judge {
       model: JUDGE_MODEL,
       role: "judge",
       system:
-        "You grade an AI assistant's messages against one claim. Answer pass true only if the claim clearly holds. Keep the reason to one sentence.",
+        "You grade an AI assistant's messages against one claim. First write the reason: one or two sentences on whether the claim holds. Then set pass to true if the claim holds and false if it does not; pass must agree with your reason.",
       prompt: `Claim: ${RUBRICS[question]}\n\nThe assistant's messages:\n\n${agentText === "" ? "(no messages)" : agentText}`,
       jsonSchema: VERDICT_JSON_SCHEMA,
       parse: VerdictSchema,

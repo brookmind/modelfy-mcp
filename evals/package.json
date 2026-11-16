@@ -10,6 +10,7 @@
   "scripts": {
     "eval": "tsx src/run.ts",
     "report": "tsx src/report-cli.ts",
+    "regrade": "tsx src/regrade-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/"

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * One run of an agent, as a list of events: what the person said, what the
  * agent said, every tool call and its result, and the tokens each model used.
@@ -57,3 +59,44 @@ export interface Trace {
   /** Why the run ended: the model's stop reason, "max_turns", "timeout"… */
   stopReason: string;
 }
+
+/** Reads trace events back (from the coding agent's stdout or a result file). */
+export const TraceEventSchema = z.union([
+  z.object({
+    kind: z.enum(["agent_text", "person_text"]),
+    text: z.string(),
+    at: z.number(),
+  }),
+  z.object({
+    kind: z.literal("tool_call"),
+    id: z.string(),
+    tool: z.string(),
+    input: z.record(z.string(), z.unknown()),
+    at: z.number(),
+  }),
+  z.object({
+    kind: z.literal("tool_result"),
+    id: z.string(),
+    tool: z.string(),
+    isError: z.boolean(),
+    code: z.string().nullable(),
+    text: z.string(),
+    at: z.number(),
+  }),
+  z.object({
+    kind: z.literal("usage"),
+    role: z.enum(["agent", "person", "judge"]),
+    model: z.string(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheWriteTokens: z.number(),
+  }),
+]);
+
+export const TraceSchema = z.object({
+  events: z.array(TraceEventSchema),
+  startedAt: z.number(),
+  endedAt: z.number(),
+  stopReason: z.string(),
+});

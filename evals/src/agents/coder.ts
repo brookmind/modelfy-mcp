@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { z } from "zod";
-import type { Trace, TraceEvent } from "../trace.ts";
+import { TraceEventSchema, type Trace, type TraceEvent } from "../trace.ts";
 
 /** Modelfy device codes: XXXX-XXXX from consonants only (no vowels). */
 const USER_CODE = /\b[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}\b/;
@@ -104,36 +104,7 @@ export function sandboxEnv(anthropicKey: string): NodeJS.ProcessEnv {
 
 const EventSchema = z.union([
   z.object({ kind: z.literal("turn_end"), stopReason: z.string() }),
-  z.object({
-    kind: z.enum(["agent_text", "person_text"]),
-    text: z.string(),
-    at: z.number(),
-  }),
-  z.object({
-    kind: z.literal("tool_call"),
-    id: z.string(),
-    tool: z.string(),
-    input: z.record(z.string(), z.unknown()),
-    at: z.number(),
-  }),
-  z.object({
-    kind: z.literal("tool_result"),
-    id: z.string(),
-    tool: z.string(),
-    isError: z.boolean(),
-    code: z.string().nullable(),
-    text: z.string(),
-    at: z.number(),
-  }),
-  z.object({
-    kind: z.literal("usage"),
-    role: z.enum(["agent", "person", "judge"]),
-    model: z.string(),
-    inputTokens: z.number(),
-    outputTokens: z.number(),
-    cacheReadTokens: z.number(),
-    cacheWriteTokens: z.number(),
-  }),
+  TraceEventSchema,
 ]);
 
 export interface CoderRun {
