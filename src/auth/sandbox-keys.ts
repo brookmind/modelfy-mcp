@@ -1,10 +1,17 @@
 import { z } from "zod";
 import { randomBase62, randomBase64Url, sha256Hex } from "../crypto";
-import { clientIp, hourlyLimit } from "../limits";
+import {
+  DAY_MS,
+  keyRequestWait,
+  secondsToUtcMidnight,
+  windowLimit,
+} from "../limits";
 import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_KEYS_PER_IP_PER_HOUR = 5;
+/** All addresses together get this many times one address's hourly keys in a UTC day */
+const DAILY_TOTAL_FACTOR = 20;
 
 /** The budget of a sandbox key that acts as a bot: a new live key's defaults */
 export const SANDBOX_BOT_BUDGET = {
@@ -30,11 +37,20 @@ export function bareLayerAllowed(setting: string | undefined): boolean {
   return setting === "true";
 }
 
-export function sandboxKeysPerHour(setting: string | undefined): number {
+/** A limit from the Worker's vars: a positive whole number, or the default. */
+export function limitSetting(
+  setting: string | undefined,
+  fallback: number,
+): number {
   const value = Number.parseInt(setting ?? "", 10);
-  return Number.isInteger(value) && value > 0
-    ? value
-    : DEFAULT_KEYS_PER_IP_PER_HOUR;
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function tooMany(description: string, retryAfter: number): Response {
+  return Response.json(
+    { error: "rate_limited", error_description: description },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
 }
 
 function invalidRequest(description: string): Response {
@@ -100,19 +116,23 @@ export async function createSandboxKey(
   ) {
     return invalidRequest('agent_layer "bare" is not available here.');
   }
-  const perHour = sandboxKeysPerHour(env.SANDBOX_KEYS_PER_HOUR);
-  const allowed = await hourlyLimit(
-    env.OAUTH_KV,
-    `sandbox-keys:${clientIp(request)}`,
-    perHour,
+  const perHour = limitSetting(
+    env.SANDBOX_KEYS_PER_HOUR,
+    DEFAULT_KEYS_PER_IP_PER_HOUR,
   );
-  if (!allowed) {
-    return Response.json(
-      {
-        error: "rate_limited",
-        error_description: `At most ${perHour} sandbox keys per hour from one address. Reuse the key you have.`,
-      },
-      { status: 429, headers: { "Retry-After": "3600" } },
+  const wait = await keyRequestWait(env, request, "sandbox-keys", perHour);
+  if (wait > 0) {
+    return tooMany(
+      `At most ${perHour} sandbox keys per hour from one address, one request at a time. Reuse the key you have.`,
+      wait,
+    );
+  }
+  // All addresses together: free keys cannot use up the storage sign-ins need
+  const perDay = perHour * DAILY_TOTAL_FACTOR;
+  if (!(await windowLimit(env.OAUTH_KV, "sandbox-keys-all", perDay, DAY_MS))) {
+    return tooMany(
+      "No more free sandbox keys today (the daily total resets at 00:00 UTC). Reuse a key you have, or get your own with device login (POST /device/code).",
+      secondsToUtcMidnight(),
     );
   }
   const apiKey = `mfy_test_${randomBase62(43)}`;

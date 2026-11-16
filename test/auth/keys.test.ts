@@ -4,8 +4,9 @@ import { env } from "cloudflare:workers";
 import {
   bareLayerAllowed,
   createSandboxKey,
-  sandboxKeysPerHour,
+  limitSetting,
 } from "../../src/auth/sandbox-keys";
+import { limitAddress, secondsToUtcMidnight } from "../../src/limits";
 import { call, connect, json, mockApi } from "../helpers/worker";
 
 const LIVE = `mfy_live_${"L".repeat(43)}`;
@@ -130,6 +131,50 @@ describe("anonymous sandbox keys", () => {
 
     expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
     expect((await sandboxKey("203.0.113.10")).status).toBe(200);
+  });
+
+  it("IPv6 addresses of one /64 share the sandbox key limit", async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      statuses.push((await sandboxKey(`2001:db8:7:9::${i + 1}`)).status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+    expect((await sandboxKey("2001:db8:7:a::1")).status).toBe(200);
+  });
+
+  it("sandbox key requests fired at once cannot all pass the hourly counter", async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 30 }, () => sandboxKey("203.0.113.77")),
+    );
+
+    const created = responses.filter((response) => response.status === 200);
+    const refused = responses.find((response) => response.status === 429);
+    // The test config lets 10 through KEY_REQUESTS (production: 1 per 10 s);
+    // without it all 30 would read the same hourly count and pass
+    expect(created.length).toBeGreaterThan(0);
+    expect(created.length).toBeLessThanOrEqual(10);
+    expect(refused?.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("past the hourly limit the answer says to wait an hour", async () => {
+    for (let i = 0; i < 5; i++) await sandboxKey("203.0.113.78");
+
+    const refused = await sandboxKey("203.0.113.78");
+
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("Retry-After")).toBe("3600");
+  });
+
+  it.each([
+    ["198.51.100.7", "198.51.100.7"],
+    ["2001:db8:7:9::1", "2001:db8:7:9::/64"],
+    ["2001:0DB8:0007:0009:ffff:ffff:ffff:ffff", "2001:db8:7:9::/64"],
+    ["2001:db8::1", "2001:db8:0:0::/64"],
+    ["::1", "0:0:0:0::/64"],
+    ["::ffff:198.51.100.7", "198.51.100.7"],
+  ])("limits count %s as %s", (ip, counted) => {
+    expect(limitAddress(ip)).toBe(counted);
   });
 });
 
@@ -362,9 +407,47 @@ describe("sandbox key options", () => {
     expect(bareLayerAllowed("false")).toBe(false);
   });
 
-  it("the keys per hour come from SANDBOX_KEYS_PER_HOUR, 5 by default", () => {
-    expect(sandboxKeysPerHour("200")).toBe(200);
-    expect(sandboxKeysPerHour(undefined)).toBe(5);
-    expect(sandboxKeysPerHour("not a number")).toBe(5);
+  it("a limit comes from its var, or the default when it is not a number", () => {
+    expect(limitSetting("200", 5)).toBe(200);
+    expect(limitSetting(undefined, 5)).toBe(5);
+    expect(limitSetting("not a number", 5)).toBe(5);
+  });
+
+  it("past the daily total of all addresses, a new address gets 429", async () => {
+    const day = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    await env.OAUTH_KV.put(`limit:sandbox-keys-all:${day}`, "1000");
+
+    const refused = await sandboxKey("203.0.113.90");
+
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toMatchObject({ error: "rate_limited" });
+    // The wait is the time left until 00:00 UTC
+    expect(Number(refused.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(Number(refused.headers.get("Retry-After"))).toBeLessThanOrEqual(
+      24 * 60 * 60,
+    );
+  });
+
+  it("a counter write that KV refuses still gives the key, not a 500", async () => {
+    // The test before used up the day's total
+    const day = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    await env.OAUTH_KV.delete(`limit:sandbox-keys-all:${day}`);
+    const put = env.OAUTH_KV.put.bind(env.OAUTH_KV);
+    vi.spyOn(env.OAUTH_KV, "put").mockImplementation((key, value, options) =>
+      key.startsWith("limit:")
+        ? Promise.reject(new Error("KV PUT failed: 429 Too Many Requests"))
+        : put(key, value, options),
+    );
+
+    const response = await sandboxKey("203.0.113.91");
+
+    expect(response.status).toBe(200);
+  });
+
+  it.each([
+    [Date.UTC(2026, 10, 16, 23, 59, 30), 30],
+    [Date.UTC(2026, 10, 16, 0, 0, 0), 24 * 60 * 60],
+  ])("at %d the daily windows restart in %d s", (now, seconds) => {
+    expect(secondsToUtcMidnight(now)).toBe(seconds);
   });
 });
