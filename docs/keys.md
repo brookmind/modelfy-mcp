@@ -101,7 +101,7 @@ curl -X POST https://mcp.modelfy.ai/device/token \
 | `400 {"error": "access_denied"}`                               | The person said no | Stop                                                  |
 | `400 {"error": "expired_token"}`                               | 10 minutes passed  | Start again                                           |
 
-The key is delivered once. The server limits device codes to 10 per hour per address and one request every 10 seconds (an IPv6 address counts as its /64).
+The key is delivered once. The server limits device codes to 10 per hour per address and one request every 10 seconds (an IPv6 address counts as its /64). Over that limit, `POST /device/code` answers `429 {"error": "rate_limited"}` with a `Retry-After` header: wait that many seconds before starting again (`slow_down` is only for polling `/device/token`).
 
 ## API keys by hand
 
@@ -111,4 +111,13 @@ A person can have up to 20 keys, change a key's budget at any time, and revoke a
 
 ## Which kind of key is this?
 
-`get_account` returns `keyKind` (`oauth`, `live`, `test`, `anonymous`) and `sandbox`. The server's instructions on connect also change with the kind: for example, OAuth connections must ask the person before spending.
+`get_account` returns `keyKind` and `sandbox`, and says in words which key it is:
+
+| `keyKind`   | What it is                                    | `sandbox` |
+| ----------- | --------------------------------------------- | --------- |
+| `anonymous` | A sandbox key of no account (`/sandbox/keys`) | `true`    |
+| `test`      | A test key of a person's Modelfy account      | `true`    |
+| `live`      | A person's API key that spends their credits  | `false`   |
+| `oauth`     | A person's connection from a chat assistant   | `false`   |
+
+A test key from device login or the Modelfy web is the person's own key even though `sandbox` is `true`: keep it. The server's instructions on connect also change with the kind: for example, OAuth connections must ask the person before spending.

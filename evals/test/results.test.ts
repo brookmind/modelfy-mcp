@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendRow,
   doneKeys,
+  layerOf,
   metricsOf,
   redact,
   type ResultRow,
@@ -78,6 +79,20 @@ describe("results", () => {
     await appendRow(path, row("budget", 1));
 
     expect(await doneKeys(path)).toEqual(new Set(["budget|v0|1"]));
+  });
+
+  it("a v1 run is kept apart from v0 runs of the same task and rep", async () => {
+    const path = await tempFile();
+
+    await appendRow(path, { ...row("says-no", 0), arm: "v1" });
+
+    expect(await doneKeys(path)).toEqual(new Set(["says-no|v1|0"]));
+  });
+
+  it("v1 measures the shipped agent layer of a newer server; bare strips it", () => {
+    expect(layerOf("v1")).toBe("v0");
+    expect(layerOf("v0")).toBe("v0");
+    expect(layerOf("bare")).toBe("bare");
   });
 
   it("doneKeys of a missing file is empty", async () => {

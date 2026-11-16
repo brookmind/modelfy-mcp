@@ -41,7 +41,7 @@ export class AgentError extends Error {
 }
 
 export const BUDGET_NEXT_STEP =
-  "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.";
+  "Over the budget per photo session: plan smaller sessions (fewer photos or products each) and launch them one at a time. Over the daily budget: wait until it resets (budget.resetsAt) or ask the key's owner to raise it.";
 
 function budgetDetails(body: unknown): Record<string, unknown> | null {
   if (typeof body !== "object" || body === null || !("budget" in body)) {

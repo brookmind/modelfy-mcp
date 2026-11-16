@@ -1,4 +1,4 @@
-// Runs the evals: npm run eval -- --suite a|b|all --arm v0|bare --reps N
+// Runs the evals: npm run eval -- --suite a|b|all --arm bare|v0|v1 --reps N
 //   [--tasks id,id] [--run-id id] [--concurrency N]
 // Needs ANTHROPIC_API_KEY. Reuse --run-id to resume a run that stopped.
 import Anthropic from "@anthropic-ai/sdk";
@@ -14,12 +14,15 @@ import { checkCodeTask, SUITE_B } from "./tasks/suite-b.ts";
 import { makeJudge } from "./grade/judge.ts";
 import {
   appendRow,
+  ArmSchema,
   doneKeys,
+  layerOf,
   metricsOf,
   rowKey,
+  type Arm,
   type ResultRow,
 } from "./results.ts";
-import { createSandboxKey, type AgentLayer } from "./sandbox-key.ts";
+import { createSandboxKey } from "./sandbox-key.ts";
 import { SUITE_A } from "./tasks/suite-a.ts";
 import type { Grade } from "./tasks/types.ts";
 import type { Trace, Usage } from "./trace.ts";
@@ -36,7 +39,7 @@ export interface Job {
   personInChat: boolean;
   run(
     client: Anthropic,
-    arm: AgentLayer,
+    arm: Arm,
   ): Promise<{
     trace: Trace;
     grade: Grade;
@@ -53,7 +56,7 @@ const SUITE_A_JOBS: Job[] = SUITE_A.map((task) => ({
   async run(client, arm) {
     const key = await createSandboxKey({
       actsAs: task.actsAs,
-      agentLayer: arm,
+      agentLayer: layerOf(arm),
     });
     const trace = await runChat(client, task, key);
     const extraUsages: Usage[] = [];
@@ -155,7 +158,11 @@ async function main(): Promise<void> {
       concurrency: { type: "string", default: "3" },
     },
   });
-  const arm: AgentLayer = values.arm === "bare" ? "bare" : "v0";
+  const parsedArm = ArmSchema.safeParse(values.arm);
+  if (!parsedArm.success) {
+    throw new Error(`--arm must be one of ${ArmSchema.options.join(", ")}`);
+  }
+  const arm = parsedArm.data;
   const reps = Number.parseInt(values.reps, 10);
   const concurrency = Number.parseInt(values.concurrency, 10);
   const wanted = values.tasks?.split(",") ?? null;
@@ -168,7 +175,7 @@ async function main(): Promise<void> {
       (values.suite === "all" || job.suite === values.suite) &&
       (wanted === null || wanted.includes(job.task)) &&
       // The bare arm exists for the chat suite only
-      (arm === "v0" || job.suite === "a"),
+      (arm !== "bare" || job.suite === "a"),
   );
   const done = await doneKeys(resultsPath);
   const pending: Pending[] = [];

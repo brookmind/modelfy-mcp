@@ -20,8 +20,12 @@ export ANTHROPIC_API_KEY=…            # never commit it
 npm run eval -- --suite a --arm v0 --reps 1 --run-id pilot
 npm run eval -- --suite all --arm v0 --reps 5 --run-id baseline-v0
 npm run eval -- --suite a --arm bare --reps 5 --run-id baseline-bare
-npm run report -- baseline-bare baseline-v0
+# after tuning, against the tuned server (EVALS_BASE_URL)
+npm run eval -- --suite all --arm v1 --reps 5 --run-id tuned-v1
+npm run report -- baseline-bare baseline-v0 tuned-v1
 ```
+
+- `--arm`: `bare` strips all agent-facing text, `v0` is the server as first shipped, `v1` the server after tuning (same sandbox key as v0; the server measured differs, recorded in each run's `meta.json`).
 
 - `--tasks id,id` runs only some tasks; `--concurrency N` (default 3) runs N at a time.
 - Reuse `--run-id` to resume: finished (task, arm, rep) runs are skipped, and a run that crashed is tried again.

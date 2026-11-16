@@ -73,14 +73,21 @@ async function scriptRuns(
   child.stderr?.on("data", (chunk: Buffer) => {
     stderr = (stderr + chunk.toString()).slice(-300);
   });
-  const timer = setTimeout(() => child.kill("SIGKILL"), SCRIPT_TIMEOUT_MS);
-  const code = await new Promise<number | null>((resolve) => {
-    child.on("exit", resolve);
+  // Resolves on the timeout too: a sandbox that never exits cannot hang a run
+  const code = await new Promise<number | "timeout" | null>((resolve) => {
+    const timer = setTimeout(() => {
+      sandbox.stop();
+      resolve("timeout");
+    }, SCRIPT_TIMEOUT_MS);
+    child.on("exit", (exitCode) => {
+      clearTimeout(timer);
+      resolve(exitCode);
+    });
   });
-  clearTimeout(timer);
   // A sandbox without network says nothing about the agent's script
   const networkError = sandbox.networkError();
   if (networkError !== null) throw new Error(networkError);
+  if (code === "timeout") return `timed out: ${stderr.trim()}`;
   return code === 0 ? null : `exit ${String(code)}: ${stderr.trim()}`;
 }
 

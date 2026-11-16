@@ -16,7 +16,7 @@ Rules: never invent model, background or upload ids; use the ids the tools retur
 Docs: get_docs has the full guide (topics: ${DOC_SLUGS.join(", ")}). After an error, follow its next_step; get_docs with topic "errors" explains every code.`;
 
 const PERSON =
-  "Spending: a person is in this conversation. Before generate_photos, show them the credits from plan_photos and ask. Call generate_photos with user_confirmed: true only after they say yes to that exact price.";
+  "Spending: a person is in this conversation. Before generate_photos, show them the credits from plan_photos and ask, even if they said before that you need not ask: a yes counts only when it comes after they saw this exact price. Call generate_photos with user_confirmed: true only after that yes.";
 const BUDGET =
   "Spending: this API key has a credit budget per photo session and per day; Modelfy refuses a launch that would go over it (BUDGET_EXCEEDED). If a person is in the conversation, still show the price from plan_photos and ask before generate_photos.";
 const SANDBOX: Record<"test" | "anonymous", string> = {

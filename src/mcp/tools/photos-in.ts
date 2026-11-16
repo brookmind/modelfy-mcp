@@ -122,7 +122,7 @@ export function registerPhotoInputTools(
       title: "Uploaded photos",
       description: layer.tool(
         "get_uploaded_photos",
-        "Confirms what has arrived in an upload session: ready upload ids for plan_photos, files still pending, and rejected files with the reason. Free.",
+        "Confirms what has arrived in an upload session: ready_upload_ids (pass them to plan_photos as upload_ids), pending (files not arrived yet) and rejected (each with its reason). Free.",
       ),
       inputSchema: ReadInput,
       outputSchema: ReadOutput,
@@ -131,8 +131,22 @@ export function registerPhotoInputTools(
     ({ session_id }) =>
       guarded(session, async () => {
         const state = await session.backend.readUploadSession(session_id);
+        // The ids in the sentence itself: a coding agent in the evals looked
+        // for a `ready` field and reported the upload as rejected
+        const ready =
+          state.ready_upload_ids.length > 0
+            ? layer.guidance(
+                ` Ready upload ids: ${state.ready_upload_ids.join(", ")}; pass them to plan_photos as upload_ids.`,
+              )
+            : "";
+        const waiting =
+          state.pending > 0
+            ? layer.guidance(
+                " Pending files have not arrived yet: call get_uploaded_photos again in a few seconds.",
+              )
+            : "";
         return respond(
-          `${state.ready_upload_ids.length} ready, ${state.pending} pending, ${state.rejected.length} rejected.`,
+          `${state.ready_upload_ids.length} ready, ${state.pending} pending, ${state.rejected.length} rejected.${ready}${waiting}`,
           { ...state },
         );
       }),

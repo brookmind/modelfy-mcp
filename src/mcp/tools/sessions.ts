@@ -4,6 +4,7 @@ import {
   SESSION_STATES,
   SHOT_TYPES,
   type SessionStatus,
+  type StoredPlan,
 } from "../../backend/types";
 import { base64 } from "../../crypto";
 import { AgentError } from "../errors";
@@ -184,6 +185,30 @@ async function smallImage(url: string): Promise<CallToolResult["content"]> {
   }
 }
 
+/**
+ * For a key with a budget: when the plan is over the budget per photo
+ * session, how to do the job anyway (smaller sessions, one at a time). Bots
+ * in the evals gave up instead of splitting.
+ */
+export function splitAdvice(
+  plan: StoredPlan,
+  sessionLimit: number,
+  leftToday: number,
+): string {
+  if (plan.credits <= sessionLimit || plan.photos === 0) return "";
+  const perPhoto = plan.credits / plan.photos;
+  const over = ` This is over this key's budget per photo session (${sessionLimit} credits)`;
+  if (perPhoto > sessionLimit) {
+    return `${over} and one photo costs more than that: ask the key's owner to raise the budget.`;
+  }
+  // A session must also fit what is left of the daily budget
+  const perSession = Math.floor(Math.min(sessionLimit, leftToday) / perPhoto);
+  if (perSession === 0) {
+    return `${over}, and the ${leftToday} credits left today are not enough for one photo: wait until the daily budget resets (budget.resetsAt) or ask the key's owner to raise it.`;
+  }
+  return `${over}, so generate_photos would refuse it: plan smaller sessions of at most ${perSession} photos each (for example fewer photos per product, or one product per session) and launch them one at a time; ${leftToday} credits are left today.`;
+}
+
 function statusSentence(status: SessionStatus, layer: LayerText): string {
   return status.status === "running"
     ? `Session ${status.session_id}: ${status.done} of ${status.total} photos ready.${layer.guidance(" Call get_photo_session again with wait_seconds.")}`
@@ -231,11 +256,21 @@ export function registerSessionTools(
         const ask =
           spendingRule(session.props) === "person"
             ? layer.guidance(
-                " Ask the person before calling generate_photos with user_confirmed: true.",
+                " Show the person this price and ask before calling generate_photos with user_confirmed: true, even if they said earlier that you need not ask.",
               )
             : "";
+        const split =
+          budget === null
+            ? ""
+            : layer.guidance(
+                splitAdvice(
+                  plan.stored,
+                  budget.session_limit,
+                  budget.left_today,
+                ),
+              );
         return respond(
-          `${plan.stored.photos} photos for ${plan.stored.credits} credits (balance ${account.credits}).${ask}`,
+          `${plan.stored.photos} photos for ${plan.stored.credits} credits (balance ${account.credits}).${ask}${split}`,
           {
             quote_id: quote.id,
             expires_at: quote.expiresAt,
@@ -258,13 +293,13 @@ export function registerSessionTools(
       title: "Generate the planned photos",
       description: layer.tool(
         "generate_photos",
-        "Launches the session planned by plan_photos (spends its credits; failed photos are refunded). Needs the quote_id. When a person is in the conversation, show them the price and set user_confirmed: true only after they agree. Then follow it with get_photo_session.",
+        "Launches the session planned by plan_photos (spends its credits; failed photos are refunded). Needs the quote_id. When a person is in the conversation, show them the price and set user_confirmed: true only after they agree after seeing this price; a 'no need to ask' said before they saw it is not a yes. With a key's budget, a plan over the budget per photo session is refused: plan and launch smaller sessions instead. Then follow it with get_photo_session.",
       ),
       inputSchema: z.object({
         quote_id: z.string(),
         user_confirmed: layer.describe(
           z.boolean().optional(),
-          "True only after the person said yes to this exact price",
+          "True only after the person said yes to this exact price, after seeing it",
         ),
       }),
       outputSchema: SessionOutput,

@@ -8,6 +8,8 @@ import { TraceEventSchema, type Trace, type TraceEvent } from "../trace.ts";
 /** Modelfy device codes: XXXX-XXXX from consonants only (no vowels). */
 const USER_CODE = /\b[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}\b/;
 const RUN_TIMEOUT_MS = 15 * 60 * 1000;
+/** slirp4netns is ready in well under a second when it works at all. */
+const NETWORK_READY_TIMEOUT_MS = 30 * 1000;
 const APPROVED_MESSAGE =
   "I opened the link and approved it in the browser. Please go on.";
 
@@ -143,13 +145,20 @@ export interface SandboxProcess {
    * harness, not the agent, and must not be graded.
    */
   networkError(): string | null;
+  /**
+   * Kills the whole sandbox and closes its pipes, so whatever waits on it
+   * ends. Killing bwrap alone is not enough: the process inside the
+   * namespace can outlive it and keep the pipes open.
+   */
+  stop(): void;
 }
 
 /**
  * Starts a command in the sandbox and connects its network: once bwrap
  * reports the namespace's pid, slirp4netns gives it internet access (with
  * the host's loopback disabled), then the command is released. If the
- * network fails, the command is stopped and networkError() says why.
+ * network fails or is not ready in time, the sandbox is stopped and
+ * networkError() says why.
  */
 export function spawnSandboxed(
   paths: SandboxPaths,
@@ -168,10 +177,30 @@ export function spawnSandboxed(
   }
   let failure: string | null = null;
   let finished = false;
+  let released = false;
+  let namespacePid: number | null = null;
+  const stop = (): void => {
+    child.kill("SIGKILL");
+    if (namespacePid !== null) {
+      try {
+        process.kill(namespacePid, "SIGKILL");
+      } catch {
+        // Already gone
+      }
+    }
+    for (const stream of child.stdio) stream?.destroy();
+  };
   const fail = (reason: string): void => {
     failure ??= reason;
-    child.kill("SIGKILL");
+    stop();
   };
+  const readyTimer = setTimeout(() => {
+    if (!released) {
+      fail(
+        `the sandbox network was not ready after ${String(NETWORK_READY_TIMEOUT_MS / 1000)}s`,
+      );
+    }
+  }, NETWORK_READY_TIMEOUT_MS);
   let text = "";
   let network: ChildProcess | null = null;
   info.on("data", (chunk: Buffer) => {
@@ -183,6 +212,7 @@ export function spawnSandboxed(
     } catch {
       return; // Not the whole JSON yet
     }
+    namespacePid = pid;
     network = spawn(
       "slirp4netns",
       [
@@ -206,6 +236,8 @@ export function spawnSandboxed(
       return;
     }
     ready.once("data", () => {
+      released = true;
+      clearTimeout(readyTimer);
       release.end("1");
     });
     network.on("error", (error) => {
@@ -220,9 +252,17 @@ export function spawnSandboxed(
   });
   child.on("exit", () => {
     finished = true;
+    clearTimeout(readyTimer);
     network?.kill();
   });
-  return { child, networkError: () => failure };
+  return {
+    child,
+    // A command that never got its network measured nothing
+    networkError: () =>
+      failure ??
+      (finished && !released ? "the sandbox network never started" : null),
+    stop,
+  };
 }
 
 /**
@@ -285,7 +325,7 @@ export async function runCoder(
   }
   const timer = setTimeout(() => {
     trace.stopReason = "timeout";
-    child.kill("SIGKILL");
+    sandbox.stop();
   }, RUN_TIMEOUT_MS);
   let stderr = "";
   errors.on("data", (chunk: Buffer) => {

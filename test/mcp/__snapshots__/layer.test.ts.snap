@@ -76,6 +76,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
             ],
           },
           "keyKind": {
+            "description": "anonymous: a sandbox key of no account; test: a test key of a Modelfy account (sandbox); live: an account's API key that spends credits; oauth: a person's connection",
             "enum": [
               "oauth",
               "live",
@@ -91,7 +92,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
             ],
           },
           "sandbox": {
-            "description": "True for test keys: nothing is spent",
+            "description": "True for anonymous and test keys: nothing is spent and photos are samples",
             "type": "boolean",
           },
         },
@@ -556,7 +557,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
         "openWorldHint": false,
         "readOnlyHint": true,
       },
-      "description": "Confirms what has arrived in an upload session: ready upload ids for plan_photos, files still pending, and rejected files with the reason. Free.",
+      "description": "Confirms what has arrived in an upload session: ready_upload_ids (pass them to plan_photos as upload_ids), pending (files not arrived yet) and rejected (each with its reason). Free.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -829,7 +830,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
         "openWorldHint": false,
         "readOnlyHint": false,
       },
-      "description": "Launches the session planned by plan_photos (spends its credits; failed photos are refunded). Needs the quote_id. When a person is in the conversation, show them the price and set user_confirmed: true only after they agree. Then follow it with get_photo_session.",
+      "description": "Launches the session planned by plan_photos (spends its credits; failed photos are refunded). Needs the quote_id. When a person is in the conversation, show them the price and set user_confirmed: true only after they agree after seeing this price; a 'no need to ask' said before they saw it is not a yes. With a key's budget, a plan over the budget per photo session is refused: plan and launch smaller sessions instead. Then follow it with get_photo_session.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -837,7 +838,7 @@ Sandbox: this is a test key. Nothing is spent and the photos are samples marked 
             "type": "string",
           },
           "user_confirmed": {
-            "description": "True only after the person said yes to this exact price",
+            "description": "True only after the person said yes to this exact price, after seeing it",
             "type": "boolean",
           },
         },

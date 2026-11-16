@@ -15,8 +15,14 @@ function accountOut(d: Describe) {
     credits: d(z.number(), "Credits available now"),
     plan: z.string().nullable(),
     creditsPerPhoto: z.number().nullable(),
-    keyKind: TokenKindSchema,
-    sandbox: d(z.boolean(), "True for test keys: nothing is spent"),
+    keyKind: d(
+      TokenKindSchema,
+      "anonymous: a sandbox key of no account; test: a test key of a Modelfy account (sandbox); live: an account's API key that spends credits; oauth: a person's connection",
+    ),
+    sandbox: d(
+      z.boolean(),
+      "True for anonymous and test keys: nothing is spent and photos are samples",
+    ),
     budget: d(BudgetSchema.nullable(), "Live keys only"),
   });
 }
@@ -73,6 +79,19 @@ const OptionsOut = z.object({
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false };
 
+/**
+ * What the connection is, in words: a coding agent in the evals read an
+ * account's test key as "the sandbox" and threw it away.
+ */
+const KEY_KINDS: Record<z.infer<typeof TokenKindSchema>, string> = {
+  anonymous:
+    "This is an anonymous sandbox key, not tied to any Modelfy account: nothing is spent and photos are samples.",
+  test: "This is a test key of a Modelfy account: it belongs to that person's account, nothing is spent and photos are samples. For real photos the account needs a live key.",
+  live: "This is a live API key of a Modelfy account: launches spend real credits, within the key's budget.",
+  oauth:
+    "This is a person's Modelfy connection: launches spend their credits after their yes.",
+};
+
 export function registerAccountTools(
   server: McpServer,
   session: Session,
@@ -94,7 +113,7 @@ export function registerAccountTools(
       guarded(session, async () => {
         const account = await session.backend.account();
         return respond(
-          `${account.credits} credits available${account.sandbox ? " (sandbox)" : ""}.`,
+          `${account.credits} credits available${account.sandbox ? " (sandbox)" : ""}.${layer.guidance(` ${KEY_KINDS[account.keyKind]}`)}`,
           { ...account },
         );
       }),
