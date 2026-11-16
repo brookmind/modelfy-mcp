@@ -18,11 +18,17 @@ export interface Grade {
 
 export type JudgeQuestion = "replied_in_spanish" | "explained_budget";
 
+export interface Verdict {
+  pass: boolean;
+  /** One sentence, kept in the failure reasons */
+  reason: string;
+}
+
 /** Asks the judge one question about the agent's messages. */
 export type Judge = (
   question: JudgeQuestion,
   agentText: string,
-) => Promise<boolean>;
+) => Promise<Verdict>;
 
 export interface ChatTask {
   id: string;

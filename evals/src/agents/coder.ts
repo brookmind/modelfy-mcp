@@ -9,7 +9,11 @@ const RUN_TIMEOUT_MS = 15 * 60 * 1000;
 const APPROVED_MESSAGE =
   "I opened the link and approved it in the browser. Please go on.";
 
+/** Only text about a device login can carry a code to approve. */
+const DEVICE_CONTEXT = /activate|approve|user_code|user code|device/i;
+
 export function findUserCode(text: string): string | null {
+  if (!DEVICE_CONTEXT.test(text)) return null;
   return USER_CODE.exec(text)?.[0] ?? null;
 }
 
@@ -171,6 +175,7 @@ export async function runCoder(
   });
 
   let approvedCode: string | null = null;
+  const tried = new Set<string>();
   let toldApproved = false;
   for await (const line of createInterface({ input: child.stdout })) {
     let parsed: z.infer<typeof EventSchema>;
@@ -193,9 +198,20 @@ export async function runCoder(
       (event.kind === "agent_text" || event.kind === "tool_result")
     ) {
       const code = findUserCode(event.text);
-      if (code !== null) {
-        approvedCode = code;
-        await approve(code);
+      // Each code is tried once, as a person would
+      if (code !== null && !tried.has(code)) {
+        tried.add(code);
+        try {
+          await approve(code);
+          approvedCode = code;
+        } catch (error) {
+          // The person could not approve (wrong code, no dev session): the run
+          // goes on, and its grade shows that nothing was approved
+          approvedCode = null;
+          console.log(
+            `could not approve ${code}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
     }
   }

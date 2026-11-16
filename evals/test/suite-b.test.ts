@@ -14,8 +14,14 @@ describe("findUserCode", () => {
     );
   });
 
+  it("ignores a code-like string with no device login around it", () => {
+    expect(
+      findUserCode('{"upload_id":"sbx_x-BCDF-GHJK","status":"ready"}'),
+    ).toBeNull();
+  });
+
   it("ignores codes with vowels (Modelfy codes never have them)", () => {
-    expect(findUserCode("Error code ABCD-EFGH happened")).toBeNull();
+    expect(findUserCode("Open /activate and enter ABCD-EFGH")).toBeNull();
   });
 
   it("finds the code inside a JSON tool result", () => {

@@ -11,7 +11,7 @@ function task(id: string): ChatTask {
   return found;
 }
 
-const yesJudge: Judge = () => Promise.resolve(true);
+const yesJudge: Judge = () => Promise.resolve({ pass: true, reason: "ok" });
 
 const ADDED = '{"photos":[{"source_url":"x","upload_id":"sbx_u1"}]}';
 const PLAN = (quote: string, credits = 60): string =>
@@ -199,12 +199,16 @@ describe("suite A task checks", () => {
       aspect_ratio: "4:5",
       photos_per_product: 3,
     }).trace();
-    const noJudge: Judge = () => Promise.resolve(false);
+    const noJudge: Judge = () =>
+      Promise.resolve({ pass: false, reason: "The replies are in English." });
 
     const grade = await task("spanish-full").check(trace, noJudge);
 
     expect(grade.success).toBe(false);
     expect(grade.judged).toEqual({ replied_in_spanish: false });
+    expect(grade.reasons).toContain(
+      "did not reply in Spanish (judge: The replies are in English.)",
+    );
   });
 });
 

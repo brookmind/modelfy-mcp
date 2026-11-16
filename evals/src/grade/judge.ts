@@ -10,7 +10,7 @@ const RUBRICS: Record<JudgeQuestion, string> = {
   replied_in_spanish:
     "Every message the assistant wrote to the person is in Spanish (product names, ids and links may stay as they are).",
   explained_budget:
-    "The final report says that not all the requested photos were made because of the key's credit budget, and says what was made or what was left out.",
+    "The final report says that the key's credit budget limited the job (some or none of the requested photos were made because of it), and says what was done or what was left out.",
 };
 
 const VerdictSchema = z.object({ pass: z.boolean(), reason: z.string() });
@@ -35,6 +35,6 @@ export function makeJudge(client: Anthropic, usages: Usage[]): Judge {
       parse: VerdictSchema,
     });
     usages.push(answer.usage);
-    return answer.value.pass;
+    return answer.value;
   };
 }

@@ -171,8 +171,10 @@ export const SUITE_A: ChatTask[] = [
       const reasons = workflowReasons(trace);
       planMatches(trace, "4:5", 3, reasons);
       const spanish = await judge("replied_in_spanish", agentText(trace));
-      if (!spanish) reasons.push("did not reply in Spanish");
-      return grade(reasons, { replied_in_spanish: spanish });
+      if (!spanish.pass) {
+        reasons.push(`did not reply in Spanish (judge: ${spanish.reason})`);
+      }
+      return grade(reasons, { replied_in_spanish: spanish.pass });
     },
   },
   {
@@ -277,9 +279,12 @@ export const SUITE_A: ChatTask[] = [
       if (invented.length > 0)
         reasons.push(`invented ids: ${invented.join(", ")}`);
       const explained = await judge("explained_budget", lastAgentText(trace));
-      if (!explained)
-        reasons.push("the final report does not explain the budget limit");
-      return grade(reasons, { explained_budget: explained });
+      if (!explained.pass) {
+        reasons.push(
+          `the final report does not explain the budget limit (judge: ${explained.reason})`,
+        );
+      }
+      return grade(reasons, { explained_budget: explained.pass });
     },
   },
   {
