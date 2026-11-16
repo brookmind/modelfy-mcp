@@ -25,7 +25,9 @@ export const SUITE_B: CodeTask[] = [
   {
     id: "device-login",
     suite: "b",
-    prompt: `This folder is a store bot that will make real product photos with Modelfy. Modelfy's MCP server and its docs are at ${BASE_URL}. Get the bot its own Modelfy API key (I can approve things in my browser if you show me what to open), save it in a .env file as MODELFY_API_KEY, and check that the key works.`,
+    // The person approves test keys only (nothing can be spent), so the task
+    // asks for one; asking for "real photos" made agents refuse the test key
+    prompt: `This folder is a store bot that will make product photos with Modelfy. Modelfy's MCP server and its docs are at ${BASE_URL}. Get the bot its own Modelfy API key tied to my Modelfy account (a test key is fine for now; I can approve things in my browser if you show me what to open), save it in a .env file as MODELFY_API_KEY, and check that the key works.`,
   },
 ];
 
