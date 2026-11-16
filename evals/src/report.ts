@@ -184,6 +184,17 @@ function renderSuite(summary: Summary): string {
       metric("Cost per run (USD)", (arm) =>
         arm.runs === 0 ? "–" : `$${(arm.totalCostUsd / arm.runs).toFixed(4)}`,
       ),
+      // A failed run is paid for too and leaves the job undone
+      metric("Seconds per successful run", (arm) =>
+        arm.passes === 0
+          ? "–"
+          : ((arm.meanSeconds * arm.runs) / arm.passes).toFixed(0),
+      ),
+      metric("Cost per successful run (USD)", (arm) =>
+        arm.passes === 0
+          ? "–"
+          : `$${(arm.totalCostUsd / arm.passes).toFixed(4)}`,
+      ),
       metric("Total cost (USD)", (arm) => `$${arm.totalCostUsd.toFixed(2)}`),
     ],
   );

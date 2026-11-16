@@ -10,17 +10,19 @@ Arms: **bare** is the same server with no agent-facing text (no instructions, on
 
 Claude API with the Modelfy MCP connector; a simulated store owner answers.
 
-| Metric                      | bare          | v0            | v1             |
-| --------------------------- | ------------- | ------------- | -------------- |
-| Runs                        | 45            | 45            | 45             |
-| Task success (95% interval) | 27% (16%–41%) | 80% (66%–89%) | 98% (88%–100%) |
-| Asked before spending       | 13/39         | 31/35         | 35/35          |
-| Invented ids (total)        | 0             | 0             | 0              |
-| Tool calls per run          | 6.4           | 6.8           | 7.9            |
-| Tool errors per run         | 0.6           | 0.1           | 0.1            |
-| Seconds per run             | 17            | 22            | 19             |
-| Cost per run (USD)          | $0.0043       | $0.0047       | $0.0056        |
-| Total cost (USD)            | $0.19         | $0.21         | $0.25          |
+| Metric                        | bare          | v0            | v1             |
+| ----------------------------- | ------------- | ------------- | -------------- |
+| Runs                          | 45            | 45            | 45             |
+| Task success (95% interval)   | 27% (16%–41%) | 80% (66%–89%) | 98% (88%–100%) |
+| Asked before spending         | 13/39         | 31/35         | 35/35          |
+| Invented ids (total)          | 0             | 0             | 0              |
+| Tool calls per run            | 6.4           | 6.8           | 7.9            |
+| Tool errors per run           | 0.6           | 0.1           | 0.1            |
+| Seconds per run               | 17            | 22            | 19             |
+| Cost per run (USD)            | $0.0043       | $0.0047       | $0.0056        |
+| Seconds per successful run    | 62            | 28            | 19             |
+| Cost per successful run (USD) | $0.0161       | $0.0059       | $0.0057        |
+| Total cost (USD)              | $0.19         | $0.21         | $0.25          |
 
 Per task (passes / runs):
 
@@ -52,17 +54,19 @@ Why runs failed:
 
 Claude Agent SDK in an empty folder with no key: it finds the docs, gets a key and builds the integration.
 
-| Metric                      | v0              | v1              |
-| --------------------------- | --------------- | --------------- |
-| Runs                        | 10              | 5               |
-| Task success (95% interval) | 100% (72%–100%) | 100% (57%–100%) |
-| Asked before spending       | –               | –               |
-| Invented ids (total)        | 0               | 0               |
-| Tool calls per run          | 13.4            | 13.8            |
-| Tool errors per run         | 0.7             | 0.2             |
-| Seconds per run             | 61              | 86              |
-| Cost per run (USD)          | $0.0128         | $0.0147         |
-| Total cost (USD)            | $0.13           | $0.07           |
+| Metric                        | v0              | v1              |
+| ----------------------------- | --------------- | --------------- |
+| Runs                          | 10              | 5               |
+| Task success (95% interval)   | 100% (72%–100%) | 100% (57%–100%) |
+| Asked before spending         | –               | –               |
+| Invented ids (total)          | 0               | 0               |
+| Tool calls per run            | 13.4            | 13.8            |
+| Tool errors per run           | 0.7             | 0.2             |
+| Seconds per run               | 61              | 86              |
+| Cost per run (USD)            | $0.0128         | $0.0147         |
+| Seconds per successful run    | 61              | 86              |
+| Cost per successful run (USD) | $0.0128         | $0.0147         |
+| Total cost (USD)              | $0.13           | $0.07           |
 
 Per task (passes / runs):
 
