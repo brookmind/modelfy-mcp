@@ -30,6 +30,34 @@ function jsonOf(text: string): Record<string, unknown> | null {
   return null;
 }
 
+/** The id of the catalog item whose name matches, from a listing tool's result. */
+function catalogId(
+  trace: Trace,
+  tool: string,
+  field: string,
+  name: RegExp,
+): string | null {
+  for (const call of callsOf(trace, tool)) {
+    const result = resultOf(trace, call);
+    const items = result === null ? undefined : jsonOf(result.text)?.[field];
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        "id" in item &&
+        "name" in item &&
+        typeof item.id === "string" &&
+        typeof item.name === "string" &&
+        name.test(item.name)
+      ) {
+        return item.id;
+      }
+    }
+  }
+  return null;
+}
+
 function launches(trace: Trace): ToolCall[] {
   return callsOf(trace, "generate_photos").filter((call) =>
     succeeded(trace, call),
@@ -278,6 +306,13 @@ export const SUITE_A: ChatTask[] = [
           `launched ${launched} credits, over the daily budget of ${BOT_BUDGET.perDay}`,
         );
       }
+      // 320 credits fit the daily budget in sessions of 100 or less: a bot
+      // that makes nothing did not do the job
+      if (launched === 0) {
+        reasons.push(
+          `launched nothing, though the job fits the budget in sessions of ${BOT_BUDGET.perSession} credits or less`,
+        );
+      }
       const invented = inventedIds(trace);
       if (invented.length > 0)
         reasons.push(`invented ids: ${invented.join(", ")}`);
@@ -323,17 +358,29 @@ export const SUITE_A: ChatTask[] = [
     check(trace: Trace): Promise<Grade> {
       const reasons = workflowReasons(trace);
       const input = launchedPlanInput(trace);
-      const models = input?.model_ids;
-      if (input !== null && (!Array.isArray(models) || models.length === 0)) {
-        reasons.push("planned without the model");
-      }
-      // A gallery background or the place in words: both are right
+      if (input === null) return Promise.resolve(grade(reasons));
+      const ana = catalogId(trace, "list_models", "models", /^ana$/i);
+      const models = input.model_ids;
       if (
-        input !== null &&
-        typeof input.background_id !== "string" &&
-        typeof input.place_description !== "string"
+        ana === null ||
+        !Array.isArray(models) ||
+        models.length !== 1 ||
+        models[0] !== ana
       ) {
-        reasons.push("planned without the place");
+        reasons.push("planned without Ana (the model the person named)");
+      }
+      // The gallery's terrace, or the terrace in words: both are right
+      const terrace = catalogId(
+        trace,
+        "list_backgrounds",
+        "backgrounds",
+        /terrace/i,
+      );
+      const inWords =
+        typeof input.place_description === "string" &&
+        /terrace/i.test(input.place_description);
+      if (!(terrace !== null && input.background_id === terrace) && !inWords) {
+        reasons.push("planned without the sunny terrace");
       }
       return Promise.resolve(grade(reasons));
     },

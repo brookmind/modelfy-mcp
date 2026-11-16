@@ -162,6 +162,73 @@ describe("suite A task checks", () => {
     );
   });
 
+  it("budget fails when the bot gave up without launching anything", async () => {
+    const trace = new Script()
+      .person("Automated job")
+      .call("plan_photos", {}, PLAN("q_all", 320))
+      .agent("Not launched: 320 credits is over the 100-credit session budget.")
+      .trace();
+
+    const grade = await task("budget").check(trace, yesJudge);
+
+    expect(grade.success).toBe(false);
+    expect(grade.reasons.join(" ")).toContain("launched nothing");
+  });
+
+  const MODELS =
+    '{"models":[{"id":"sbx_model_ana","name":"Ana"},{"id":"sbx_model_leo","name":"Leo"}]}';
+  const PLACES =
+    '{"backgrounds":[{"id":"sbx_set_terrace","name":"Sunny terrace"}]}';
+
+  function namesTrace(plan: Record<string, unknown>): Script {
+    return new Script()
+      .person("With Ana on the sunny terrace")
+      .call("add_product_photos", {}, ADDED)
+      .call("list_models", {}, MODELS)
+      .call("list_backgrounds", {}, PLACES)
+      .call(
+        "plan_photos",
+        { products: [{ upload_ids: ["sbx_u1"] }], ...plan },
+        PLAN("q_1"),
+      )
+      .person("Yes")
+      .call("generate_photos", { quote_id: "q_1", user_confirmed: true }, DONE);
+  }
+
+  it("names-not-ids passes with Ana's id and the terrace", async () => {
+    const trace = namesTrace({
+      model_ids: ["sbx_model_ana"],
+      background_id: "sbx_set_terrace",
+    }).trace();
+
+    expect((await task("names-not-ids").check(trace, yesJudge)).success).toBe(
+      true,
+    );
+  });
+
+  it("names-not-ids fails with another real model (Leo)", async () => {
+    const trace = namesTrace({
+      model_ids: ["sbx_model_leo"],
+      background_id: "sbx_set_terrace",
+    }).trace();
+
+    const grade = await task("names-not-ids").check(trace, yesJudge);
+
+    expect(grade.success).toBe(false);
+    expect(grade.reasons.join(" ")).toContain("Ana");
+  });
+
+  it("names-not-ids accepts the terrace in words instead of its id", async () => {
+    const trace = namesTrace({
+      model_ids: ["sbx_model_ana"],
+      place_description: "a sunny terrace with plants",
+    }).trace();
+
+    expect((await task("names-not-ids").check(trace, yesJudge)).success).toBe(
+      true,
+    );
+  });
+
   it("names-not-ids fails when model_ids holds a made-up id", async () => {
     const trace = new Script()
       .person("With Ana on the sunny terrace")

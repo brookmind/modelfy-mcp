@@ -1,5 +1,7 @@
 # Agent evals Implementation Plan
 
+> **Status:** done. This is the plan as written before building; where the build changed course (server options after PRs #4 and #8, the pinned local server, the device-login and grading fixes), `evals/DESIGN.md` is the current description.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task (the owner's rules: implement in the main session, no implementer subagents). Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A harness in `modelfy-mcp/evals/` that runs Claude Haiku 5.5 as a chat assistant and as a coding agent against the dev sandbox, grades the traces, and records the v0 and bare baselines in `evals/REPORT.md`.

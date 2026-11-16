@@ -246,7 +246,7 @@ export function renderReport(
     .join("; ");
   return `# Agent evals: results
 
-Runs: ${runIds.map((id) => `\`${id}\``).join(", ")}. Models: ${models.join(", ")}. Server: the Modelfy MCP sandbox on mcp-dev (nothing is spent). How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
+Runs: ${runIds.map((id) => `\`${id}\``).join(", ")}. Models: ${models.join(", ")}. Server: the Modelfy MCP sandbox (nothing is spent), version below. How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
 
 Server measured by each run: ${versions}.
 

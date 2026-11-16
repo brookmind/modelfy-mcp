@@ -8,7 +8,7 @@ import {
 } from "../src/agents/coder.ts";
 import type { TraceEvent } from "../src/trace.ts";
 import { redact } from "../src/results.ts";
-import { deviceLoginReasons } from "../src/tasks/suite-b.ts";
+import { deviceLoginReasons, nodeScriptReasons } from "../src/tasks/suite-b.ts";
 import { Script } from "./script.ts";
 
 const KEY = `mfy_test_${"Q".repeat(43)}`;
@@ -118,6 +118,38 @@ describe("telling the agent the code was approved", () => {
         keySaved: false,
       }),
     ).toBe(false);
+  });
+});
+
+describe("node-script check", () => {
+  it("passes when the rerun works and made 4 new photos", () => {
+    expect(
+      nodeScriptReasons({
+        rerunFailure: null,
+        photosBefore: 8,
+        photosAfter: 12,
+      }),
+    ).toEqual([]);
+  });
+
+  it("fails when the rerun exits 0 but made no new photos", () => {
+    expect(
+      nodeScriptReasons({
+        rerunFailure: null,
+        photosBefore: 8,
+        photosAfter: 8,
+      }),
+    ).toContain("the rerun made 0 new photos, not 4");
+  });
+
+  it("fails when the rerun fails", () => {
+    expect(
+      nodeScriptReasons({
+        rerunFailure: "exit 1",
+        photosBefore: 4,
+        photosAfter: 4,
+      }),
+    ).toContain("make-photos.mjs failed when rerun: exit 1");
   });
 });
 

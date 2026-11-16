@@ -98,15 +98,44 @@ export async function checkCodeTask(
     });
     return { success: reasons.length === 0, reasons, judged: {} };
   }
-  const reasons: string[] = [];
   if (key === null) {
-    reasons.push("no MODELFY_API_KEY in .env");
-  } else {
-    const failure = await scriptRuns(paths, key);
-    if (failure !== null)
-      reasons.push(`make-photos.mjs failed when rerun: ${failure}`);
-    if ((await recentPhotoCount(key)) === 0)
-      reasons.push("the key's account has no photos");
+    return {
+      success: false,
+      reasons: ["no MODELFY_API_KEY in .env"],
+      judged: {},
+    };
   }
+  // Photos from the agent's own tries do not count: the rerun must make 4
+  const photosBefore = await recentPhotoCount(key);
+  const rerunFailure = await scriptRuns(paths, key);
+  const photosAfter = await recentPhotoCount(key);
+  const reasons = nodeScriptReasons({
+    rerunFailure,
+    photosBefore,
+    photosAfter,
+  });
   return { success: reasons.length === 0, reasons, judged: {} };
+}
+
+/** The photos the script was asked for, made by the grader's own rerun. */
+const NODE_SCRIPT_PHOTOS = 4;
+
+export interface NodeScriptFacts {
+  rerunFailure: string | null;
+  photosBefore: number;
+  photosAfter: number;
+}
+
+export function nodeScriptReasons(facts: NodeScriptFacts): string[] {
+  const reasons: string[] = [];
+  if (facts.rerunFailure !== null) {
+    reasons.push(`make-photos.mjs failed when rerun: ${facts.rerunFailure}`);
+  }
+  const made = facts.photosAfter - facts.photosBefore;
+  if (made < NODE_SCRIPT_PHOTOS) {
+    reasons.push(
+      `the rerun made ${made} new photos, not ${NODE_SCRIPT_PHOTOS}`,
+    );
+  }
+  return reasons;
 }
