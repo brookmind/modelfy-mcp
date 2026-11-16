@@ -3,6 +3,7 @@
 // each and evals/REPORT.md for all the given runs together.
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { z } from "zod";
 import { renderReport, summarize, type ReportRow } from "./report.ts";
 import { ResultRowSchema } from "./results.ts";
 
@@ -32,14 +33,35 @@ if (runIds.length === 0) {
   console.error("Usage: npm run report -- <run-id> [<run-id>…]");
   process.exit(1);
 }
+const Meta = z.object({ server: z.string() });
+
+/** results/<run>/meta.json says which server version the run measured. */
+async function serverOf(runId: string): Promise<string | null> {
+  try {
+    const text = await readFile(
+      join(EVALS_DIR, "results", runId, "meta.json"),
+      "utf8",
+    );
+    return Meta.parse(JSON.parse(text)).server;
+  } catch {
+    return null;
+  }
+}
+
 const all: ReportRow[] = [];
+const servers: Record<string, string> = {};
 for (const runId of runIds) {
   const rows = await rowsOf(runId);
   all.push(...rows);
+  const server = await serverOf(runId);
+  if (server !== null) servers[runId] = server;
   await writeFile(
     join(EVALS_DIR, "results", runId, "summary.json"),
     `${JSON.stringify(summarize(rows), null, 2)}\n`,
   );
 }
-await writeFile(join(EVALS_DIR, "REPORT.md"), renderReport(all, runIds));
+await writeFile(
+  join(EVALS_DIR, "REPORT.md"),
+  renderReport(all, runIds, servers),
+);
 console.log(`REPORT.md from ${all.length} runs`);

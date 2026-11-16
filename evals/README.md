@@ -26,6 +26,8 @@ npm run report -- baseline-bare baseline-v0
 - `--tasks id,id` runs only some tasks; `--concurrency N` (default 3) runs N at a time.
 - Reuse `--run-id` to resume: finished (task, arm, rep) runs are skipped, and a run that crashed is tried again.
 - Results go to `results/<run-id>/results.jsonl` (one line per run with the grade, the metrics and the whole trace; Modelfy and Anthropic keys are redacted).
+- Write the server version the run measured in `results/<run-id>/meta.json` (`{"server": "mcp-dev Worker version …"}`; `npx wrangler deployments list --env dev` shows it). The report prints it: a run is only comparable with another on the same version, or as a before/after.
+- `npm run regrade -- <run-id>` grades stored chat runs again with the current graders (only the judge is called), for a grader fix that must not need new agent runs. Commit the results before and after, so the change is visible.
 
 ### Suite B needs
 

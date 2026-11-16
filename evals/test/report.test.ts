@@ -110,4 +110,12 @@ describe("renderReport", () => {
     expect(markdown).toContain("95%");
     expect(markdown).toContain("claude-haiku-5-5");
   });
+
+  it("names the server version each run measured", () => {
+    const markdown = renderReport([row("says-no", "v0", 0, true)], ["r1"], {
+      r1: "Worker 91de9ef4 (main 224c846)",
+    });
+
+    expect(markdown).toContain("`r1`: Worker 91de9ef4 (main 224c846)");
+  });
 });

@@ -231,14 +231,24 @@ ${reasons}`;
  * The report: the arms compared on the chat suite (the only one with a bare
  * arm), and the coding agent on its own, so suites never mix in a number.
  */
-export function renderReport(rows: ReportRow[], runIds: string[]): string {
+export function renderReport(
+  rows: ReportRow[],
+  runIds: string[],
+  /** The server version each run measured (results/<run>/meta.json) */
+  servers: Record<string, string> = {},
+): string {
   const chat = summarize(rows.filter((row) => row.suite === "a"));
   const coding = summarize(rows.filter((row) => row.suite === "b"));
   const models = summarize(rows).models;
   const runsPerArm = chat.arms[0]?.runs ?? 0;
+  const versions = runIds
+    .map((id) => `\`${id}\`: ${servers[id] ?? "server version not recorded"}`)
+    .join("; ");
   return `# Agent evals: results
 
 Runs: ${runIds.map((id) => `\`${id}\``).join(", ")}. Models: ${models.join(", ")}. Server: the Modelfy MCP sandbox on mcp-dev (nothing is spent). How the evals work: [DESIGN.md](DESIGN.md); how to run them: [README.md](README.md).
+
+Server measured by each run: ${versions}.
 
 Arms: **bare** is the same server with no agent-facing text (no instructions, one-line tool descriptions, no schema descriptions, no guidance in results or errors, no docs); **v0** is the server as shipped before tuning; **v1** is after tuning.
 
