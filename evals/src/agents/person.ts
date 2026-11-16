@@ -44,7 +44,7 @@ Rules:
 - Answer only from what you know above, in one or two short sentences, in the language of the facts.
 - If the assistant asks something you do not know, say it can choose.
 - Never invent ids, links or technical details.
-- Set done to true and reply to null when the assistant has finished the job (it showed the photos or a final result), gave up, or has nothing left to ask you. Otherwise set done to false and give your reply.`;
+- Set done to true and reply to null when the assistant has finished the job (it showed the photos or a final result), gave up, accepted your no, or has nothing left to ask you. Do not repeat yourself or say thanks just to keep talking. Otherwise set done to false and give your reply.`;
 }
 
 /** The conversation as the person saw it: their messages and the assistant's. */
