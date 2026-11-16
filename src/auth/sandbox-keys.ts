@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { randomBase62, randomBase64Url, sha256Hex } from "../crypto";
-import { DAY_MS, keyRequestWait, windowLimit } from "../limits";
+import {
+  DAY_MS,
+  keyRequestWait,
+  secondsToUtcMidnight,
+  windowLimit,
+} from "../limits";
 import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -127,7 +132,7 @@ export async function createSandboxKey(
   if (!(await windowLimit(env.OAUTH_KV, "sandbox-keys-all", perDay, DAY_MS))) {
     return tooMany(
       "No more free sandbox keys today (the daily total resets at 00:00 UTC). Reuse a key you have, or get your own with device login (POST /device/code).",
-      3600,
+      secondsToUtcMidnight(),
     );
   }
   const apiKey = `mfy_test_${randomBase62(43)}`;

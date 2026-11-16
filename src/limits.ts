@@ -17,10 +17,20 @@ export async function windowLimit(
   const counterKey = `limit:${key}:${Math.floor(now / windowMs)}`;
   const used = Number((await kv.get(counterKey)) ?? "0");
   if (used >= max) return false;
-  await kv.put(counterKey, String(used + 1), {
-    expirationTtl: (2 * windowMs) / 1000,
-  });
+  try {
+    await kv.put(counterKey, String(used + 1), {
+      expirationTtl: (2 * windowMs) / 1000,
+    });
+  } catch {
+    // KV takes about one write per second to a key: a busy counter misses a
+    // count instead of failing the request (the limit is approximate anyway)
+  }
   return true;
+}
+
+/** Seconds until the next 00:00 UTC, when the daily windows start again. */
+export function secondsToUtcMidnight(now: number = Date.now()): number {
+  return Math.ceil((DAY_MS - (now % DAY_MS)) / 1000);
 }
 
 /**
