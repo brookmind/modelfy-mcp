@@ -12,9 +12,16 @@ const APPROVED_MESSAGE =
 /** Only text about a device login can carry a code to approve. */
 const DEVICE_CONTEXT = /activate|approve|user_code|user code|device/i;
 
+/** The sample code in docs/keys.md: an agent that read the docs prints it. */
+const DOCS_EXAMPLE_CODES = new Set(["BCDF-GHJK"]);
+
 export function findUserCode(text: string): string | null {
   if (!DEVICE_CONTEXT.test(text)) return null;
-  return USER_CODE.exec(text)?.[0] ?? null;
+  const pattern = new RegExp(USER_CODE.source, "g");
+  for (const match of text.matchAll(pattern)) {
+    if (!DOCS_EXAMPLE_CODES.has(match[0])) return match[0];
+  }
+  return null;
 }
 
 export interface SandboxPaths {

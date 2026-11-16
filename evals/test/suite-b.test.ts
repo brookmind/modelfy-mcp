@@ -14,6 +14,12 @@ describe("findUserCode", () => {
     );
   });
 
+  it("ignores the docs' example code", () => {
+    expect(
+      findUserCode('Example: {"user_code": "BCDF-GHJK", "device_code": "…"}'),
+    ).toBeNull();
+  });
+
   it("ignores a code-like string with no device login around it", () => {
     expect(
       findUserCode('{"upload_id":"sbx_x-BCDF-GHJK","status":"ready"}'),
@@ -25,8 +31,8 @@ describe("findUserCode", () => {
   });
 
   it("finds the code inside a JSON tool result", () => {
-    expect(findUserCode('{"user_code":"BCDF-GHJK","interval":5}')).toBe(
-      "BCDF-GHJK",
+    expect(findUserCode('{"user_code":"PQRS-TVWX","interval":5}')).toBe(
+      "PQRS-TVWX",
     );
   });
 });
