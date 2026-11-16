@@ -83,6 +83,8 @@ describe("the sandbox around the coding agent", () => {
     expect(
       bound.filter((path) => path === home || path.startsWith(`${home}/`)),
     ).toEqual([]);
+    expect(args.join(" ")).not.toContain("--ro-bind /etc /etc");
+    expect(args.join(" ")).toContain("/etc/resolv.conf");
     expect(args).toContain("--unshare-all");
     expect(args).toContain("--share-net");
     expect(args.join(" ")).toContain(`--bind ${runDir} /work`);

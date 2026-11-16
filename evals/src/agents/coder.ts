@@ -20,19 +20,29 @@ export interface SandboxPaths {
   runDir: string;
 }
 
+/** From /etc, only what DNS, TLS and user lookups need. */
+const ETC_FILES = [
+  "/etc/resolv.conf",
+  "/etc/hosts",
+  "/etc/nsswitch.conf",
+  "/etc/passwd",
+  "/etc/group",
+  "/etc/ssl",
+  "/etc/ca-certificates",
+  "/etc/alternatives",
+];
+
 /**
  * The coding agent runs shell commands, so it runs in bubblewrap: system
  * folders read-only, an empty home, only the run folder writable, network on.
- * The host's home (tokens, configs) is never mounted.
+ * The host's home (tokens, configs) and the rest of /etc are never mounted.
  */
 export function bwrapArgs(paths: SandboxPaths): string[] {
   return [
     "--ro-bind",
     "/usr",
     "/usr",
-    "--ro-bind",
-    "/etc",
-    "/etc",
+    ...ETC_FILES.flatMap((path) => ["--ro-bind-try", path, path]),
     "--symlink",
     "usr/lib",
     "/lib",
