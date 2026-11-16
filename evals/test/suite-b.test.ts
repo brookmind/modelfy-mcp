@@ -1,10 +1,14 @@
-import { homedir } from "node:os";
+import { existsSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   bwrapArgs,
   codeToApprove,
   findUserCode,
   shouldTellApproved,
+  spawnSandboxed,
 } from "../src/agents/coder.ts";
 import type { TraceEvent } from "../src/trace.ts";
 import { redact } from "../src/results.ts";
@@ -267,5 +271,31 @@ describe("redaction of Anthropic keys", () => {
     expect(
       redact(`env: ANTHROPIC_API_KEY=sk-ant-api03-${"x".repeat(40)}`),
     ).toBe("env: ANTHROPIC_API_KEY=sk-ant-***");
+  });
+});
+
+const canSandbox = ["/usr/bin/bwrap", "/usr/bin/slirp4netns"].every((path) =>
+  existsSync(path),
+);
+
+describe.runIf(canSandbox)("a real sandbox", () => {
+  it("stop() ends a command that never exits, pipes and all", async () => {
+    const runDir = await mkdtemp(join(tmpdir(), "evals-run-"));
+    const sandbox = spawnSandboxed(
+      { harness: join(import.meta.dirname, ".."), runDir },
+      ["/usr/bin/sleep", "1000"],
+      { PATH: "/usr/bin:/bin" },
+    );
+    const closed = new Promise<void>((resolve) => {
+      sandbox.child.stdout?.on("close", resolve);
+      sandbox.child.stdout?.resume();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    sandbox.stop();
+
+    // Whatever waits on the sandbox's output ends, so a run cannot hang
+    await closed;
+    expect(sandbox.child.killed).toBe(true);
   });
 });
