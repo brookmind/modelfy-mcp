@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { z } from "zod";
+import { savedKey } from "../env-file.ts";
 import { TraceEventSchema, type Trace, type TraceEvent } from "../trace.ts";
 
 /** Modelfy device codes: XXXX-XXXX from consonants only (no vowels). */
@@ -22,6 +23,19 @@ export function findUserCode(text: string): string | null {
     if (!DOCS_EXAMPLE_CODES.has(match[0])) return match[0];
   }
   return null;
+}
+
+/**
+ * The person says "I approved it" once, and only while the agent still waits
+ * for the key: an agent that already saved it would take the message as a
+ * new request.
+ */
+export function shouldTellApproved(state: {
+  approved: boolean;
+  alreadyTold: boolean;
+  keySaved: boolean;
+}): boolean {
+  return state.approved && !state.alreadyTold && !state.keySaved;
 }
 
 export interface SandboxPaths {
@@ -164,7 +178,11 @@ export async function runCoder(
     }
     if (parsed.kind === "turn_end") {
       trace.stopReason = parsed.stopReason;
-      const tell: boolean = approvedCode !== null && !toldApproved;
+      const tell = shouldTellApproved({
+        approved: approvedCode !== null,
+        alreadyTold: toldApproved,
+        keySaved: (await savedKey(paths.runDir)) !== null,
+      });
       toldApproved ||= tell;
       child.stdin.write(tell ? `continue ${APPROVED_MESSAGE}\n` : "stop\n");
       continue;

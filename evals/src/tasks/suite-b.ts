@@ -1,9 +1,8 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { promisify } from "node:util";
 import { bwrapArgs, type SandboxPaths } from "../agents/coder.ts";
 import { BASE_URL } from "../config.ts";
+import { savedKey } from "../env-file.ts";
 import { keyWorks, recentPhotoCount } from "../mcp-check.ts";
 import type { Trace } from "../trace.ts";
 import type { Grade } from "./types.ts";
@@ -29,21 +28,6 @@ export const SUITE_B: CodeTask[] = [
     prompt: `This folder is a store bot that will make real product photos with Modelfy. Modelfy's MCP server and its docs are at ${BASE_URL}. Get the bot its own Modelfy API key (I can approve things in my browser if you show me what to open), save it in a .env file as MODELFY_API_KEY, and check that the key works.`,
   },
 ];
-
-/** The MODELFY_API_KEY line of the run's .env, if the agent wrote one. */
-export async function savedKey(runDir: string): Promise<string | null> {
-  let text: string;
-  try {
-    text = await readFile(join(runDir, ".env"), "utf8");
-  } catch {
-    return null;
-  }
-  const match =
-    /^\s*(?:export\s+)?MODELFY_API_KEY\s*=\s*["']?(mfy_[A-Za-z0-9_]+)["']?\s*$/m.exec(
-      text,
-    );
-  return match?.[1] ?? null;
-}
 
 function agentText(trace: Trace): string {
   return trace.events

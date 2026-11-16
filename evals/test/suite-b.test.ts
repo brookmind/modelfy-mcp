@@ -1,6 +1,10 @@
 import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { bwrapArgs, findUserCode } from "../src/agents/coder.ts";
+import {
+  bwrapArgs,
+  findUserCode,
+  shouldTellApproved,
+} from "../src/agents/coder.ts";
 import { redact } from "../src/results.ts";
 import { deviceLoginReasons } from "../src/tasks/suite-b.ts";
 import { Script } from "./script.ts";
@@ -34,6 +38,45 @@ describe("findUserCode", () => {
     expect(findUserCode('{"user_code":"PQRS-TVWX","interval":5}')).toBe(
       "PQRS-TVWX",
     );
+  });
+});
+
+describe("telling the agent the code was approved", () => {
+  it("tells it once, while it still waits for the key", () => {
+    expect(
+      shouldTellApproved({
+        approved: true,
+        alreadyTold: false,
+        keySaved: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("stays quiet when the agent already saved the key", () => {
+    expect(
+      shouldTellApproved({
+        approved: true,
+        alreadyTold: false,
+        keySaved: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("stays quiet when nothing was approved or it was already told", () => {
+    expect(
+      shouldTellApproved({
+        approved: false,
+        alreadyTold: false,
+        keySaved: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldTellApproved({
+        approved: true,
+        alreadyTold: true,
+        keySaved: false,
+      }),
+    ).toBe(false);
   });
 });
 
