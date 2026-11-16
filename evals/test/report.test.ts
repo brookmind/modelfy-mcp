@@ -100,6 +100,7 @@ describe("renderReport", () => {
     const markdown = renderReport([row("says-no", "v0", 0, false)], ["r1"]);
 
     expect(markdown).toContain("| Cost per successful run (USD) | – |");
+    expect(markdown).toContain("| Seconds per successful run | – |");
   });
 
   it("compares the arms on the chat suite only and shows the coding agent apart", () => {

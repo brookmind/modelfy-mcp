@@ -1212,9 +1212,19 @@
 
       <footer>
         <span
-          >Tables and failure reasons: <a href="REPORT.md">REPORT.md</a>. How
-          the evals work: <a href="DESIGN.md">DESIGN.md</a>. How to run them:
-          <a href="README.md">README.md</a>.</span
+          >Tables and failure reasons:
+          <a
+            href="https://github.com/brookmind/modelfy-mcp/blob/main/evals/REPORT.md"
+            >REPORT.md</a
+          >. How the evals work:
+          <a
+            href="https://github.com/brookmind/modelfy-mcp/blob/main/evals/DESIGN.md"
+            >DESIGN.md</a
+          >. How to run them:
+          <a
+            href="https://github.com/brookmind/modelfy-mcp/blob/main/evals/README.md"
+            >README.md</a
+          >.</span
         >
         <span
           >Raw runs: <code>results/baseline-bare</code>,
@@ -3337,18 +3347,29 @@
             var total = RUNS[arm].reduce(function (sum, r) {
               return sum + r[key];
             }, 0);
-            values[arm] = total / stats[arm].passed;
+            // A version that passed nothing has no figure per successful run
+            values[arm] =
+              stats[arm].passed === 0 ? null : total / stats[arm].passed;
           });
           var max = Math.max.apply(
             null,
             ARMS.map(function (a) {
-              return values[a];
+              return values[a] === null ? 0 : values[a];
             }),
           );
           ARMS.forEach(function (arm, i) {
             var yTop = 10 + i * 38,
               v = values[arm];
             svgEl("text", { class: "armlabel", x: 0, y: yTop + 15 }, svg, arm);
+            if (v === null || max === 0) {
+              svgEl(
+                "text",
+                { class: "axis", x: x0, y: yTop + 15 },
+                svg,
+                "no run passed",
+              );
+              return;
+            }
             var g = svgEl(
               "g",
               {
@@ -3387,7 +3408,9 @@
             what +
               " per successful run: " +
               ARMS.map(function (a) {
-                return a + " " + format(values[a]);
+                return (
+                  a + " " + (values[a] === null ? "none" : format(values[a]))
+                );
               }).join(", "),
           );
         }
