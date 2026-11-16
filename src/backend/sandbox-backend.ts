@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { GrantProps } from "../auth/props";
 import { randomBase64Url } from "../crypto";
-import { AgentError } from "../mcp/errors";
+import { AgentError, BUDGET_NEXT_STEP } from "../mcp/errors";
 import { ApiBackend } from "./api-backend";
 import { checkImageLink } from "./download";
 import { previewBody } from "./plan-body";
@@ -12,6 +12,7 @@ import {
   SANDBOX_OPTIONS,
   samplePhotoUrl,
 } from "./sandbox-fixtures";
+import { MAX_UPLOAD_FILES } from "./types";
 import type {
   Account,
   AddedPhoto,
@@ -30,13 +31,12 @@ import type {
   UploadSessionState,
 } from "./types";
 
-export const SANDBOX_CREDITS = 10_000;
-export const SANDBOX_PRICE_PER_PHOTO = 20;
+const SANDBOX_CREDITS = 10_000;
+const SANDBOX_PRICE_PER_PHOTO = 20;
 /** A sandbox session finishes this long after its launch. */
-export const SANDBOX_SESSION_MS = 4000;
+const SANDBOX_SESSION_MS = 4000;
 const TTL_SECONDS = 7 * 24 * 60 * 60;
 const UPLOAD_TTL_SECONDS = 60 * 60;
-export const MAX_SANDBOX_FILES = 10;
 
 const UploadStateSchema = z.object({
   owner: z.string(),
@@ -57,7 +57,7 @@ const SessionSchema = z.object({
 });
 type SandboxSession = z.infer<typeof SessionSchema>;
 
-export function uploadKey(id: string): string {
+function uploadKey(id: string): string {
   return `sbx-upload:${id}`;
 }
 
@@ -167,13 +167,11 @@ export class SandboxBackend implements PhotoBackend {
     const details = (limit: "session" | "day"): Record<string, unknown> => ({
       budget: { limit, requested: credits, ...budget },
     });
-    const nextStep =
-      "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.";
     if (credits > budget.maxCreditsPerSession) {
       throw new AgentError(
         "BUDGET_EXCEEDED",
         `This launch needs ${credits} credits; this key allows ${budget.maxCreditsPerSession} per photo session.`,
-        nextStep,
+        BUDGET_NEXT_STEP,
         details("session"),
       );
     }
@@ -182,7 +180,7 @@ export class SandboxBackend implements PhotoBackend {
       throw new AgentError(
         "BUDGET_EXCEEDED",
         `This launch needs ${credits} credits; this key has ${Math.max(0, left)} left today.`,
-        nextStep,
+        BUDGET_NEXT_STEP,
         details("day"),
       );
     }
@@ -260,7 +258,7 @@ export class SandboxBackend implements PhotoBackend {
       files: {},
       expiresAt: new Date(Date.now() + UPLOAD_TTL_SECONDS * 1000).toISOString(),
     };
-    const uploads = files.slice(0, MAX_SANDBOX_FILES).map((file) => {
+    const uploads = files.slice(0, MAX_UPLOAD_FILES).map((file) => {
       const uploadId = `sbx_${randomBase64Url(12)}`;
       state.files[uploadId] = "pending";
       return {
@@ -311,7 +309,7 @@ export class SandboxBackend implements PhotoBackend {
       throw new AgentError(
         "BUDGET_EXCEEDED",
         "This launch needs more credits than this key's budget allows (sandbox trigger).",
-        "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.",
+        BUDGET_NEXT_STEP,
         {
           budget: {
             limit: "day",
@@ -372,10 +370,7 @@ export class SandboxBackend implements PhotoBackend {
     await kv.put(sessionKey(id), JSON.stringify(session), {
       expirationTtl: TTL_SECONDS,
     });
-    const list = z
-      .array(z.string())
-      .safeParse(await kv.get(sessionsOfKey(this.#owner), "json"));
-    const ids = [id, ...(list.success ? list.data : [])].slice(0, 10);
+    const ids = [id, ...(await this.#sessionIds())].slice(0, 10);
     await kv.put(sessionsOfKey(this.#owner), JSON.stringify(ids), {
       expirationTtl: TTL_SECONDS,
     });
@@ -407,13 +402,7 @@ export class SandboxBackend implements PhotoBackend {
     limit: number,
     sessionId: string | null,
   ): Promise<RecentPhoto[]> {
-    const list = z
-      .array(z.string())
-      .safeParse(
-        await this.#env.OAUTH_KV.get(sessionsOfKey(this.#owner), "json"),
-      );
-    const ids =
-      sessionId !== null ? [sessionId] : list.success ? list.data : [];
+    const ids = sessionId !== null ? [sessionId] : await this.#sessionIds();
     const photos: RecentPhoto[] = [];
     for (const id of ids) {
       const status = await this.session(id).catch(() => null);
@@ -428,6 +417,16 @@ export class SandboxBackend implements PhotoBackend {
       }
     }
     return photos.slice(0, limit);
+  }
+
+  /** This owner's latest sessions, newest first. */
+  async #sessionIds(): Promise<string[]> {
+    const list = z
+      .array(z.string())
+      .safeParse(
+        await this.#env.OAUTH_KV.get(sessionsOfKey(this.#owner), "json"),
+      );
+    return list.success ? list.data : [];
   }
 
   async #load(sessionId: string): Promise<SandboxSession> {

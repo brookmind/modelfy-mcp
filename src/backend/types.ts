@@ -49,12 +49,23 @@ export interface PhotoOptions {
 }
 
 /** The backend of one connection: the Modelfy API, or the sandbox. */
-export interface PhotoBackend extends PhotoInput, PhotoSessions {
+export interface PhotoBackend {
   account(): Promise<Account>;
   models(): Promise<Model[]>;
   backgrounds(): Promise<Background[]>;
   options(): Promise<PhotoOptions>;
+  addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]>;
+  createUploadSession(files: FileToUpload[]): Promise<UploadSession>;
+  readUploadSession(sessionId: string): Promise<UploadSessionState>;
+  plan(input: PlanInput): Promise<Plan>;
+  launch(plan: StoredPlan, idempotencyKey: string): Promise<SessionStatus>;
+  session(sessionId: string): Promise<SessionStatus>;
+  cancel(sessionId: string): Promise<SessionStatus>;
+  recent(limit: number, sessionId: string | null): Promise<RecentPhoto[]>;
 }
+
+/** The most product photos one call or one upload session takes. */
+export const MAX_UPLOAD_FILES = 10;
 
 export type AddedPhoto =
   | { source_url: string; upload_id: string }
@@ -84,12 +95,6 @@ export interface UploadSessionState {
   rejected: Array<{ upload_id: string; reason: string }>;
 }
 
-export interface PhotoInput {
-  addPhotosFromUrls(urls: string[]): Promise<AddedPhoto[]>;
-  createUploadSession(files: FileToUpload[]): Promise<UploadSession>;
-  readUploadSession(sessionId: string): Promise<UploadSessionState>;
-}
-
 export const SHOT_TYPES = [
   "close-up",
   "medium-shot",
@@ -105,22 +110,21 @@ export const SHOT_TYPES = [
 export interface PlanInput {
   products: Array<{
     upload_ids: string[];
-    name?: string | undefined;
-    description?: string | undefined;
+    name?: string;
+    description?: string;
   }>;
   mode: "place" | "studio";
-  background_color?: string | undefined;
-  model_ids?: string[] | undefined;
-  background_id?: string | undefined;
-  place_description?: string | undefined;
+  background_color?: string;
+  model_ids?: string[];
+  background_id?: string;
+  place_description?: string;
   aspect_ratio: string;
   photos_per_product: number;
-  shot_types?: Array<(typeof SHOT_TYPES)[number]> | undefined;
-  outfit?:
-    { style?: string | undefined; note?: string | undefined } | undefined;
-  direction?: string | undefined;
-  resolution?: string | undefined;
-  quality?: string | undefined;
+  shot_types?: Array<(typeof SHOT_TYPES)[number]>;
+  outfit?: { style?: string; note?: string };
+  direction?: string;
+  resolution?: string;
+  quality?: string;
   locale: string;
 }
 
@@ -140,8 +144,14 @@ export interface Plan {
   promptRewritten: boolean;
 }
 
-export type SessionState =
-  "running" | "completed" | "partial" | "failed" | "cancelled";
+export const SESSION_STATES = [
+  "running",
+  "completed",
+  "partial",
+  "failed",
+  "cancelled",
+] as const;
+export type SessionState = (typeof SESSION_STATES)[number];
 
 export interface SessionPhoto {
   photo_id: string;
@@ -167,12 +177,4 @@ export interface RecentPhoto {
   created_at: string;
   session_id: string | null;
   session_name: string | null;
-}
-
-export interface PhotoSessions {
-  plan(input: PlanInput): Promise<Plan>;
-  launch(plan: StoredPlan, idempotencyKey: string): Promise<SessionStatus>;
-  session(sessionId: string): Promise<SessionStatus>;
-  cancel(sessionId: string): Promise<SessionStatus>;
-  recent(limit: number, sessionId: string | null): Promise<RecentPhoto[]>;
 }

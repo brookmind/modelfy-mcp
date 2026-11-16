@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
 import { keyRequestWait } from "../limits";
+import { BudgetLimitsSchema } from "./props";
 
 const StartedSchema = z.object({
   deviceCode: z.string(),
@@ -18,12 +19,7 @@ const PollSchema = z.discriminatedUnion("status", [
     status: z.literal("approved"),
     apiKey: z.string(),
     kind: z.enum(["LIVE", "TEST"]),
-    budget: z
-      .object({
-        maxCreditsPerSession: z.number(),
-        maxCreditsPerDay: z.number(),
-      })
-      .nullable(),
+    budget: BudgetLimitsSchema.nullable(),
   }),
 ]);
 

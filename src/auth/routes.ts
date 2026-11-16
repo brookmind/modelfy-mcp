@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
 import { randomBase64Url, sha256Hex } from "../crypto";
 import type { AppEnv } from "../env";
+import { htmlPage } from "../pages/layout";
 import type { GrantProps } from "./props";
 
 const AUTH_REQUEST_TTL_SECONDS = 600;
@@ -57,11 +58,7 @@ function authRequestKey(state: string): string {
 }
 
 function page(status: number, title: string, body: string): Response {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body style="font-family:system-ui,sans-serif;background:#000;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0"><main style="max-width:28rem;padding:2rem;text-align:center"><h1 style="font-weight:500">${title}</h1><p style="color:#a1a1a1">${body}</p></main></body></html>`;
-  return new Response(html, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+  return htmlPage(title, `<h1>${title}</h1><p>${body}</p>`, status);
 }
 
 async function readAuthRequest(
@@ -71,24 +68,6 @@ async function readAuthRequest(
   const stored = await env.OAUTH_KV.get(authRequestKey(state), "json");
   const parsed = StoredAuthRequestSchema.safeParse(stored);
   return parsed.success ? parsed.data : null;
-}
-
-function toAuthRequest(stored: StoredAuthRequest["request"]): AuthRequest {
-  return {
-    responseType: stored.responseType,
-    clientId: stored.clientId,
-    redirectUri: stored.redirectUri,
-    scope: stored.scope,
-    state: stored.state,
-    ...(stored.codeChallenge !== undefined
-      ? { codeChallenge: stored.codeChallenge }
-      : {}),
-    ...(stored.codeChallengeMethod !== undefined
-      ? { codeChallengeMethod: stored.codeChallengeMethod }
-      : {}),
-    ...(stored.resource !== undefined ? { resource: stored.resource } : {}),
-    ...(stored.issuer !== undefined ? { issuer: stored.issuer } : {}),
-  };
 }
 
 /**
@@ -161,7 +140,7 @@ export async function callback(
   }
   // One use only, whatever happens next
   await env.OAUTH_KV.delete(authRequestKey(state));
-  const authRequest = toAuthRequest(stored.request);
+  const authRequest: AuthRequest = stored.request;
   const clearCookie = `${cookieName}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`;
 
   if (url.searchParams.get("error") === "access_denied") {

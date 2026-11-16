@@ -40,24 +40,31 @@ export class AgentError extends Error {
   }
 }
 
-const BudgetDetails = (body: unknown): Record<string, unknown> | null => {
+export const BUDGET_NEXT_STEP =
+  "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.";
+
+function budgetDetails(body: unknown): Record<string, unknown> | null {
   if (typeof body !== "object" || body === null || !("budget" in body)) {
     return null;
   }
   const budget = body.budget;
   return typeof budget === "object" && budget !== null ? { budget } : null;
-};
+}
+
+function modelfyError(): AgentError {
+  return new AgentError(
+    "MODELFY_ERROR",
+    "Modelfy could not complete this right now.",
+    "Try again in a moment; if it keeps failing, tell the person.",
+  );
+}
 
 /** Maps a Modelfy API failure to what the agent should do next. */
-export function fromApiFailure(failure: ApiFailure): AgentError {
+function fromApiFailure(failure: ApiFailure): AgentError {
   switch (true) {
     case failure.status === 401 && failure.code === "MCP_SECRET_INVALID":
       // This server is misconfigured; the person's connection is fine
-      return new AgentError(
-        "MODELFY_ERROR",
-        "Modelfy could not complete this right now.",
-        "Try again in a moment; if it keeps failing, tell the person.",
-      );
+      return modelfyError();
     case failure.status === 401:
       return new AgentError(
         "CONNECTION_REVOKED",
@@ -74,8 +81,8 @@ export function fromApiFailure(failure: ApiFailure): AgentError {
       return new AgentError(
         "BUDGET_EXCEEDED",
         failure.message,
-        "Make fewer photos, wait until the daily budget resets, or ask the key's owner to raise its budget.",
-        BudgetDetails(failure.body),
+        BUDGET_NEXT_STEP,
+        budgetDetails(failure.body),
       );
     case failure.status === 404:
       return new AgentError(
@@ -96,11 +103,7 @@ export function fromApiFailure(failure: ApiFailure): AgentError {
         "Fix the input as the message says and call the tool again.",
       );
     default:
-      return new AgentError(
-        "MODELFY_ERROR",
-        "Modelfy could not complete this right now.",
-        "Try again in a moment; if it keeps failing, tell the person.",
-      );
+      return modelfyError();
   }
 }
 

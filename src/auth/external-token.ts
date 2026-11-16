@@ -5,26 +5,13 @@ import {
 } from "@cloudflare/workers-oauth-provider";
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../api/client";
+import { ConnectionSchema } from "../backend/api-schemas";
 import { sha256Hex } from "../crypto";
-import type { GrantProps } from "./props";
+import { BudgetLimitsSchema, type GrantProps } from "./props";
 import { readSandboxKey, SANDBOX_BOT_BUDGET } from "./sandbox-keys";
 
 const KEY_PATTERN = /^mfy_(live|test)_[0-9A-Za-z]{43}$/;
 const CACHE_SECONDS = 60;
-
-export const CurrentConnectionSchema = z.object({
-  userId: z.string(),
-  kind: z.enum(["LIVE", "TEST", "OAUTH"]),
-  name: z.string(),
-  budget: z
-    .object({
-      maxCreditsPerSession: z.number(),
-      maxCreditsPerDay: z.number(),
-      spentToday: z.number(),
-      resetsAt: z.string(),
-    })
-    .nullable(),
-});
 
 function cacheKey(hash: string): string {
   return `api-key:${hash}`;
@@ -33,9 +20,7 @@ function cacheKey(hash: string): string {
 const CachedPropsSchema = z.object({
   kind: z.enum(["live", "test"]),
   userId: z.string(),
-  budget: z
-    .object({ maxCreditsPerSession: z.number(), maxCreditsPerDay: z.number() })
-    .nullable(),
+  budget: BudgetLimitsSchema.nullable(),
 });
 
 /**
@@ -51,7 +36,10 @@ export async function resolveApiKey(
   if (!KEY_PATTERN.test(token)) return null;
   const hash = await sha256Hex(token);
 
-  const sandbox = await readSandboxKey(env.OAUTH_KV, hash);
+  // Only a test key can be an anonymous sandbox key
+  const sandbox = token.startsWith("mfy_test_")
+    ? await readSandboxKey(env.OAUTH_KV, hash)
+    : null;
   if (sandbox !== null) {
     const props: GrantProps = {
       kind: "anonymous",
@@ -72,11 +60,11 @@ export async function resolveApiKey(
   if (cached.success) {
     resolved = cached.data;
   } else {
-    let current: z.infer<typeof CurrentConnectionSchema>;
+    let current: z.infer<typeof ConnectionSchema>;
     try {
       current = await new ModelfyApi(env, token).get(
         "/v2/connections/me",
-        CurrentConnectionSchema,
+        ConnectionSchema,
       );
     } catch (error) {
       if (error instanceof ApiFailure && error.status === 401) return null;
@@ -90,17 +78,12 @@ export async function resolveApiKey(
       throw error;
     }
     if (current.kind === "OAUTH") return null;
-    resolved = {
+    // Parsing keeps the budget's limits and drops today's spend
+    resolved = CachedPropsSchema.parse({
       kind: current.kind === "LIVE" ? "live" : "test",
       userId: current.userId,
-      budget:
-        current.budget === null
-          ? null
-          : {
-              maxCreditsPerSession: current.budget.maxCreditsPerSession,
-              maxCreditsPerDay: current.budget.maxCreditsPerDay,
-            },
-    };
+      budget: current.budget,
+    });
     await env.OAUTH_KV.put(cacheKey(hash), JSON.stringify(resolved), {
       expirationTtl: CACHE_SECONDS,
     });

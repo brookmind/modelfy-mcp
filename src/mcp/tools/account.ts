@@ -1,16 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { TokenKindSchema } from "../../auth/props";
+import { BudgetSchema } from "../../backend/api-schemas";
 import type { Describe } from "../layer";
 import { guarded, respond, type Session } from "../session";
 
 const NoInput = z.object({});
-
-const BudgetOut = z.object({
-  maxCreditsPerSession: z.number(),
-  maxCreditsPerDay: z.number(),
-  spentToday: z.number(),
-  resetsAt: z.string(),
-});
 
 // Schema builders take the layer's describe and return the exact zod type,
 // which only inference can spell (module-private)
@@ -20,9 +15,9 @@ function accountOut(d: Describe) {
     credits: d(z.number(), "Credits available now"),
     plan: z.string().nullable(),
     creditsPerPhoto: z.number().nullable(),
-    keyKind: z.enum(["oauth", "live", "test", "anonymous"]),
+    keyKind: TokenKindSchema,
     sandbox: d(z.boolean(), "True for test keys: nothing is spent"),
-    budget: d(BudgetOut.nullable(), "Live keys only"),
+    budget: d(BudgetSchema.nullable(), "Live keys only"),
   });
 }
 

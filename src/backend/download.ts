@@ -1,6 +1,7 @@
 import { AgentError } from "../mcp/errors";
 
-const MAX_BYTES = 15 * 1024 * 1024;
+/** The largest product photo Modelfy takes. */
+export const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const TIMEOUT_MS = 20_000;
 /** The photo types Modelfy takes (the API's upload rules). */
@@ -13,7 +14,7 @@ const ACCEPTED_TYPES = new Set([
 ]);
 const BLOCKED_SUFFIXES = [".localhost", ".local", ".internal", ".lan", ".home"];
 
-export interface DownloadedImage {
+interface DownloadedImage {
   contentType: string;
   bytes: Uint8Array;
 }

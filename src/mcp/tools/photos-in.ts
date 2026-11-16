@@ -1,9 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { MAX_UPLOAD_FILES } from "../../backend/types";
 import type { Describe } from "../layer";
 import { guarded, respond, type Session } from "../session";
-
-const MAX_FILES = 10;
 
 // Schema builders take the layer's describe and return the exact zod type,
 // which only inference can spell (module-private)
@@ -11,7 +10,7 @@ const MAX_FILES = 10;
 function addInput(d: Describe) {
   return z.object({
     image_urls: d(
-      z.array(z.url()).min(1).max(MAX_FILES),
+      z.array(z.url()).min(1).max(MAX_UPLOAD_FILES),
       "Public links to the product's image files (the front first). Not web pages: the image itself.",
     ),
   });
@@ -40,7 +39,7 @@ function sessionInput(d: Describe) {
             bytes: d(z.number().int().positive(), "File size in bytes"),
           }),
         )
-        .max(MAX_FILES)
+        .max(MAX_UPLOAD_FILES)
         .default([]),
       "Files your code will upload: each gets a presigned PUT. Leave empty when a person will use the page.",
     ),

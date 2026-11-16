@@ -1,22 +1,16 @@
 import { randomBase64Url } from "./crypto";
-import {
-  MAX_SANDBOX_FILES,
-  readUploadState,
-  writeUploadState,
-} from "./backend/sandbox-backend";
+import { MAX_BYTES } from "./backend/download";
+import { readUploadState, writeUploadState } from "./backend/sandbox-backend";
+import { MAX_UPLOAD_FILES } from "./backend/types";
+import { htmlPage } from "./pages/layout";
 import {
   DEMO_IMAGE_FILES,
   demoImage,
   samplePhotoSvg,
 } from "./backend/sandbox-fixtures";
 
-const MAX_BYTES = 15 * 1024 * 1024;
-
 function html(status: number, body: string): Response {
-  return new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Modelfy sandbox</title></head><body style="font-family:system-ui,sans-serif;background:#000;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0"><main style="max-width:28rem;padding:2rem;text-align:center">${body}</main></body></html>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
+  return htmlPage("Modelfy sandbox", body, status);
 }
 
 /** A product page to try "photos from a product link" in the sandbox. */
@@ -95,7 +89,7 @@ export async function sandboxRoute(
       for (const value of form.getAll("photos")) {
         if (typeof value === "string" || !value.type.startsWith("image/"))
           continue;
-        if (Object.keys(state.files).length >= MAX_SANDBOX_FILES) break;
+        if (Object.keys(state.files).length >= MAX_UPLOAD_FILES) break;
         state.files[`sbx_${randomBase64Url(12)}`] = "ready";
         added += 1;
       }

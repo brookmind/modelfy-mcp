@@ -1,6 +1,11 @@
 import type { CallToolResult, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { SHOT_TYPES, type SessionStatus } from "../../backend/types";
+import {
+  SESSION_STATES,
+  SHOT_TYPES,
+  type SessionStatus,
+} from "../../backend/types";
+import { base64 } from "../../crypto";
 import { AgentError } from "../errors";
 import { markLaunched, readQuote, saveQuote } from "../quotes";
 import type { Describe, LayerText } from "../layer";
@@ -105,7 +110,7 @@ function planOutput(d: Describe) {
 const SessionOutput = z.object({
   session_id: z.string(),
   name: z.string(),
-  status: z.enum(["running", "completed", "partial", "failed", "cancelled"]),
+  status: z.enum(SESSION_STATES),
   total: z.number(),
   done: z.number(),
   failed: z.number(),
@@ -138,12 +143,6 @@ const RecentOutput = z.object({
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function base64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
 }
 
 /** Up to 4 finished photos as image content, so the chat can show them. */
