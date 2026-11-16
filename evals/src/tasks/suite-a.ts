@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { randomBytes } from "node:crypto";
 import { BOT_BUDGET, DEMO } from "../config.ts";
 import {
@@ -30,6 +31,8 @@ function jsonOf(text: string): Record<string, unknown> | null {
   return null;
 }
 
+const CatalogItems = z.array(z.object({ id: z.string(), name: z.string() }));
+
 /** The id of the catalog item whose name matches, from a listing tool's result. */
 function catalogId(
   trace: Trace,
@@ -39,21 +42,12 @@ function catalogId(
 ): string | null {
   for (const call of callsOf(trace, tool)) {
     const result = resultOf(trace, call);
-    const items = result === null ? undefined : jsonOf(result.text)?.[field];
-    if (!Array.isArray(items)) continue;
-    for (const item of items) {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "name" in item &&
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        name.test(item.name)
-      ) {
-        return item.id;
-      }
-    }
+    const items = CatalogItems.safeParse(
+      result === null ? undefined : jsonOf(result.text)?.[field],
+    );
+    if (!items.success) continue;
+    const found = items.data.find((item) => name.test(item.name));
+    if (found !== undefined) return found.id;
   }
   return null;
 }
