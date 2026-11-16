@@ -10,7 +10,7 @@ const RUBRICS: Record<JudgeQuestion, string> = {
   replied_in_spanish:
     "Every message the assistant wrote to the person is in Spanish (product names, ids and links may stay as they are).",
   explained_budget:
-    "The final report says that the key's credit budget limited the job (some or none of the requested photos were made because of it), and says what was done or what was left out.",
+    "The final report says how the key's credit budget shaped the job (for example that the work was split into several sessions, that fewer photos were made, or that none were made because of it), and says what was made or left out.",
 };
 
 const VerdictSchema = z.object({ reason: z.string(), pass: z.boolean() });

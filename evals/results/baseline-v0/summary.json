@@ -1,0 +1,118 @@
+{
+  "arms": [
+    {
+      "arm": "v0",
+      "runs": 55,
+      "passes": 50,
+      "interval": [
+        0.8042226375086602,
+        0.9605424266636261
+      ],
+      "consentRuns": 35,
+      "consentOk": 31,
+      "inventedIds": 0,
+      "meanToolCalls": 7.7272727272727275,
+      "meanErrors": 0.2,
+      "errors": {
+        "QUOTE_EXPIRED": 5,
+        "UNKNOWN": 6
+      },
+      "meanSeconds": 28.469781818181822,
+      "totalCostUsd": 0.34091255999999986
+    }
+  ],
+  "tasks": [
+    {
+      "task": "consent-recovery",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 1
+    },
+    {
+      "task": "page-not-image",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "says-no",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "product-page",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "spanish-full",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "missing-choices",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "names-not-ids",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "expired-quote",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "node-script",
+      "suite": "b",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    },
+    {
+      "task": "device-login",
+      "suite": "b",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 4
+    },
+    {
+      "task": "budget",
+      "suite": "a",
+      "arm": "v0",
+      "runs": 5,
+      "passes": 5
+    }
+  ],
+  "reasons": [
+    {
+      "arm": "v0",
+      "reason": "launched without a yes to the shown price",
+      "count": 4
+    },
+    {
+      "arm": "v0",
+      "reason": "did not save the key in .env",
+      "count": 1
+    }
+  ],
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}

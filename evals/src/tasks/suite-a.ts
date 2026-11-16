@@ -251,7 +251,10 @@ export const SUITE_A: ChatTask[] = [
     id: "budget",
     suite: "a",
     actsAs: "bot",
-    prompt: `Automated job from the store backend. Create product-only studio photos on a white background, format 9:16, 10 photos per product, for these 3 products: "Linen T-shirt front" ${DEMO.front}, "Linen T-shirt back" ${DEMO.back}, "Linen T-shirt detail" ${DEMO.front}. Then report what was done.`,
+    // 2 x 8 photos = 320 credits: within the 8-per-product maximum and the
+    // daily budget, over the 100-credit session cap (10 per product asked for
+    // more than the maximum, so a right answer failed the budget check)
+    prompt: `Automated job from the store backend. Create product-only studio photos on a white background, format 9:16, 8 photos per product, for these 2 products: "Linen T-shirt" ${DEMO.front} and "Linen T-shirt, back view" ${DEMO.back}. Then report what was done.`,
     persona: null,
     async check(trace: Trace, judge: Judge): Promise<Grade> {
       const reasons: string[] = [];

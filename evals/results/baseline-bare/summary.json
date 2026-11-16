@@ -1,0 +1,110 @@
+{
+  "arms": [
+    {
+      "arm": "bare",
+      "runs": 45,
+      "passes": 17,
+      "interval": [
+        0.25107885298349863,
+        0.5237032999353246
+      ],
+      "consentRuns": 44,
+      "consentOk": 18,
+      "inventedIds": 0,
+      "meanToolCalls": 6.377777777777778,
+      "meanErrors": 0.6,
+      "errors": {
+        "MISSING_CHOICE": 17,
+        "QUOTE_EXPIRED": 5,
+        "BUDGET_EXCEEDED": 5
+      },
+      "meanSeconds": 16.630177777777778,
+      "totalCostUsd": 0.1937089
+    }
+  ],
+  "tasks": [
+    {
+      "task": "consent-recovery",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 0
+    },
+    {
+      "task": "product-page",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 3
+    },
+    {
+      "task": "spanish-full",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 0
+    },
+    {
+      "task": "says-no",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 1
+    },
+    {
+      "task": "missing-choices",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 3
+    },
+    {
+      "task": "names-not-ids",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 0
+    },
+    {
+      "task": "page-not-image",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 3
+    },
+    {
+      "task": "expired-quote",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 2
+    },
+    {
+      "task": "budget",
+      "suite": "a",
+      "arm": "bare",
+      "runs": 5,
+      "passes": 5
+    }
+  ],
+  "reasons": [
+    {
+      "arm": "bare",
+      "reason": "launched without a yes to the shown price",
+      "count": 22
+    },
+    {
+      "arm": "bare",
+      "reason": "called generate_photos after the person said no",
+      "count": 4
+    },
+    {
+      "arm": "bare",
+      "reason": "never saw the session completed",
+      "count": 2
+    }
+  ],
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}
