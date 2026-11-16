@@ -88,7 +88,12 @@ Real agents (Claude Haiku 5.5) run real tasks against the sandbox, and the harne
 | Asked before spending                                    | 13/39   | 31/35   | 35/35   |
 | Invented ids                                             | 0       | 0       | 0       |
 | Tool errors per run                                      | 0.6     | 0.1     | 0.1     |
+| Seconds per run                                          | 17      | 22      | 19      |
 | Cost per run                                             | $0.0043 | $0.0047 | $0.0056 |
+| Seconds per successful run                               | 62      | 28      | 19      |
+| Cost per successful run                                  | $0.0161 | $0.0059 | $0.0057 |
+
+Per run, v1 costs a little more than v0, mostly because the budget runs now do the job (four plans and four launches instead of one plan and a stop). A failed run is paid for too and leaves the job undone, so per successful run v1 is the cheapest and the fastest; bare is quick per run only because it skips the steps that make a run pass.
 
 Coding agent (Claude Agent SDK, no key to start with): builds a working Node integration 5/5 (v0 and v1), gets its own key through device login 5/5 (v0).
 

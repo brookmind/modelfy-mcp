@@ -77,6 +77,31 @@ describe("renderReport", () => {
     expect(header).toBe("| Metric | bare | v0 |");
   });
 
+  it("divides cost and time by the runs that passed, not by all runs", () => {
+    const paid = (success: boolean, rep: number): ResultRow => {
+      const base = row("says-no", "v0", rep, success);
+      return {
+        ...base,
+        metrics: { ...base.metrics, costUsd: 0.01, seconds: 20 },
+      };
+    };
+    const markdown = renderReport(
+      [paid(true, 0), paid(false, 1), paid(false, 2), paid(false, 3)],
+      ["r1"],
+    );
+
+    // 4 runs at $0.01 and 20 s each, 1 passed
+    expect(markdown).toContain("| Cost per run (USD) | $0.0100 |");
+    expect(markdown).toContain("| Cost per successful run (USD) | $0.0400 |");
+    expect(markdown).toContain("| Seconds per successful run | 80 |");
+  });
+
+  it("shows no per-success figure when nothing passed", () => {
+    const markdown = renderReport([row("says-no", "v0", 0, false)], ["r1"]);
+
+    expect(markdown).toContain("| Cost per successful run (USD) | – |");
+  });
+
   it("compares the arms on the chat suite only and shows the coding agent apart", () => {
     const coding: ResultRow = {
       ...row("node-script", "v0", 0, true),
