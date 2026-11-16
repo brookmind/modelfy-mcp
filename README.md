@@ -119,6 +119,8 @@ npx wrangler secret put SANDBOX_ACCOUNT_KEY --env dev # a test key of the sandbo
 npm run deploy:dev
 ```
 
+After that, every push to `main` that passes CI deploys to dev on its own (`.github/workflows/ci.yml`). It needs two GitHub secrets: `CLOUDFLARE_API_TOKEN` (a token with the "Edit Cloudflare Workers" template) and `CLOUDFLARE_ACCOUNT_ID`.
+
 ## License
 
 [MIT](LICENSE)

@@ -30,9 +30,6 @@
     "API_URL": "http://localhost:3000",
     "WEB_URL": "http://localhost:5173",
     "PUBLIC_URL": "http://localhost:8787",
-    // Evals only: sandbox keys with the bare agent layer (never in production)
-    "ALLOW_BARE_AGENT_LAYER": "true",
-    "SANDBOX_KEYS_PER_HOUR": "5",
   },
   "env": {
     "dev": {
@@ -57,8 +54,6 @@
         "API_URL": "https://api-dev.modelfy.ai",
         "WEB_URL": "https://beta-dev.modelfy.ai",
         "PUBLIC_URL": "https://mcp-dev.modelfy.ai",
-        "ALLOW_BARE_AGENT_LAYER": "true",
-        "SANDBOX_KEYS_PER_HOUR": "200",
       },
     },
     "production": {
@@ -82,8 +77,6 @@
         "API_URL": "https://api.modelfy.ai",
         "WEB_URL": "https://beta.modelfy.ai",
         "PUBLIC_URL": "https://mcp.modelfy.ai",
-        "ALLOW_BARE_AGENT_LAYER": "false",
-        "SANDBOX_KEYS_PER_HOUR": "5",
       },
     },
   },

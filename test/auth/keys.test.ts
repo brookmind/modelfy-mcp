@@ -4,7 +4,7 @@ import { env } from "cloudflare:workers";
 import {
   bareLayerAllowed,
   createSandboxKey,
-  limitSetting,
+  sandboxKeysPerHour,
 } from "../../src/auth/sandbox-keys";
 import { limitAddress, secondsToUtcMidnight } from "../../src/limits";
 import { call, connect, json, mockApi } from "../helpers/worker";
@@ -381,7 +381,7 @@ describe("sandbox key options", () => {
         },
         body: JSON.stringify({ agent_layer: "bare" }),
       }),
-      { ...env, ALLOW_BARE_AGENT_LAYER: "false" },
+      { ...env, PUBLIC_URL: "https://mcp.modelfy.ai" },
     );
 
     expect(response.status).toBe(400);
@@ -401,16 +401,16 @@ describe("sandbox key options", () => {
     },
   );
 
-  it("bare is allowed only when ALLOW_BARE_AGENT_LAYER is true", () => {
-    expect(bareLayerAllowed("true")).toBe(true);
-    expect(bareLayerAllowed(undefined)).toBe(false);
-    expect(bareLayerAllowed("false")).toBe(false);
+  it("bare is allowed everywhere but production", () => {
+    expect(bareLayerAllowed("https://mcp-dev.modelfy.ai")).toBe(true);
+    expect(bareLayerAllowed("http://localhost:8787")).toBe(true);
+    expect(bareLayerAllowed("https://mcp.modelfy.ai")).toBe(false);
   });
 
-  it("a limit comes from its var, or the default when it is not a number", () => {
-    expect(limitSetting("200", 5)).toBe(200);
-    expect(limitSetting(undefined, 5)).toBe(5);
-    expect(limitSetting("not a number", 5)).toBe(5);
+  it("sandbox keys per hour: 200 where the evals run, 5 elsewhere", () => {
+    expect(sandboxKeysPerHour("https://mcp-dev.modelfy.ai")).toBe(200);
+    expect(sandboxKeysPerHour("https://mcp.modelfy.ai")).toBe(5);
+    expect(sandboxKeysPerHour("http://localhost:8787")).toBe(5);
   });
 
   it("past the daily total of all addresses, a new address gets 429", async () => {
