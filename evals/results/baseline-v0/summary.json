@@ -3,10 +3,10 @@
     {
       "arm": "v0",
       "runs": 55,
-      "passes": 50,
+      "passes": 52,
       "interval": [
-        0.8042226375086602,
-        0.9605424266636261
+        0.8514670569551007,
+        0.9812771240324999
       ],
       "consentRuns": 35,
       "consentOk": 32,
@@ -18,7 +18,7 @@
         "UNKNOWN": 1
       },
       "meanSeconds": 62.245799999999996,
-      "totalCostUsd": 0.410492385
+      "totalCostUsd": 0.410563385
     }
   ],
   "tasks": [
@@ -34,7 +34,7 @@
       "suite": "a",
       "arm": "v0",
       "runs": 5,
-      "passes": 4
+      "passes": 5
     },
     {
       "task": "missing-choices",
@@ -69,7 +69,7 @@
       "suite": "a",
       "arm": "v0",
       "runs": 5,
-      "passes": 4
+      "passes": 5
     },
     {
       "task": "expired-quote",
@@ -105,16 +105,6 @@
       "arm": "v0",
       "reason": "launched without a yes to the shown price",
       "count": 3
-    },
-    {
-      "arm": "v0",
-      "reason": "the final report does not explain the budget limit (judge: The message does state the credit budget blocked the job and explains what was done (images added, session planned) and what was left out (no photos generated), but the claim concerns a 'final report' and says 'some or none' of photos were made; the response clearly says none were made due to budget, which does satisfy the claim, so this is a pass on substance.)",
-      "count": 1
-    },
-    {
-      "arm": "v0",
-      "reason": "did not reply in Spanish (judge: The assistant's messages are written in Spanish, but the claim allows only product names, ids and links to remain non-Spanish, and the message uses an English background name 'Sunny terrace' with quotes, which is arguably a product/asset name and thus permissible; however the message also includes English-only terms? Checking closely, the only English is the background name, which is an allowed proper name, so the claim holds.)",
-      "count": 1
     }
   ],
   "models": [

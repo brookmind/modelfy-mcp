@@ -4,45 +4,70 @@ Runs: `baseline-bare`, `baseline-v0`. Models: claude-haiku-5-5. Server: the Mode
 
 Arms: **bare** is the same server with no agent-facing text (no instructions, one-line tool descriptions, no schema descriptions, no guidance in results or errors, no docs); **v0** is the server as shipped before tuning; **v1** is after tuning.
 
-## Headline
+## Chat assistant (suite A)
+
+Claude API with the Modelfy MCP connector; a simulated store owner answers.
 
 | Metric | bare | v0 |
 | --- | --- | --- |
-| Runs | 45 | 55 |
-| Task success (95% interval) | 58% (43%–71%) | 91% (80%–96%) |
+| Runs | 45 | 45 |
+| Task success (95% interval) | 58% (43%–71%) | 93% (82%–98%) |
 | Asked before spending | 23/42 | 32/35 |
 | Invented ids (total) | 0 | 0 |
-| Tool calls per run | 6.3 | 8.1 |
+| Tool calls per run | 6.3 | 6.9 |
 | Tool errors per run | 0.5 | 0.1 |
-| Seconds per run | 20 | 62 |
-| Cost per run (USD) | $0.0043 | $0.0075 |
-| Total cost (USD) | $0.19 | $0.41 |
+| Seconds per run | 20 | 22 |
+| Cost per run (USD) | $0.0043 | $0.0048 |
+| Total cost (USD) | $0.19 | $0.21 |
 
-## Per task (passes / runs)
+Per task (passes / runs):
 
-| Task | Suite | bare | v0 |
-| --- | --- | --- | --- |
-| spanish-full | A | 1/5 | 4/5 |
-| product-page | A | 2/5 | 5/5 |
-| missing-choices | A | 5/5 | 5/5 |
-| says-no | A | 3/5 | 5/5 |
-| page-not-image | A | 5/5 | 5/5 |
-| budget | A | 5/5 | 4/5 |
-| consent-recovery | A | 0/5 | 2/5 |
-| names-not-ids | A | 0/5 | 5/5 |
-| expired-quote | A | 5/5 | 5/5 |
-| node-script | B | – | 5/5 |
-| device-login | B | – | 5/5 |
+| Task | bare | v0 |
+| --- | --- | --- |
+| spanish-full | 1/5 | 5/5 |
+| product-page | 2/5 | 5/5 |
+| missing-choices | 5/5 | 5/5 |
+| says-no | 3/5 | 5/5 |
+| page-not-image | 5/5 | 5/5 |
+| budget | 5/5 | 5/5 |
+| consent-recovery | 0/5 | 2/5 |
+| names-not-ids | 0/5 | 5/5 |
+| expired-quote | 5/5 | 5/5 |
 
-## Why runs failed
+Why runs failed:
 
 | Arm | Why it failed | Runs |
 | --- | --- | --- |
 | bare | launched without a yes to the shown price | 17 |
 | bare | called generate_photos after the person said no | 2 |
 | v0 | launched without a yes to the shown price | 3 |
-| v0 | the final report does not explain the budget limit (judge: The message does state the credit budget blocked the job and explains what was done (images added, session planned) and what was left out (no photos generated), but the claim concerns a 'final report' and says 'some or none' of photos were made; the response clearly says none were made due to budget, which does satisfy the claim, so this is a pass on substance.) | 1 |
-| v0 | did not reply in Spanish (judge: The assistant's messages are written in Spanish, but the claim allows only product names, ids and links to remain non-Spanish, and the message uses an English background name 'Sunny terrace' with quotes, which is arguably a product/asset name and thus permissible; however the message also includes English-only terms? Checking closely, the only English is the background name, which is an allowed proper name, so the claim holds.) | 1 |
+
+## Coding agent (suite B)
+
+Claude Agent SDK in an empty folder with no key: it finds the docs, gets a key and builds the integration.
+
+| Metric | v0 |
+| --- | --- |
+| Runs | 10 |
+| Task success (95% interval) | 100% (72%–100%) |
+| Asked before spending | – |
+| Invented ids (total) | 0 |
+| Tool calls per run | 13.9 |
+| Tool errors per run | 0.1 |
+| Seconds per run | 242 |
+| Cost per run (USD) | $0.0197 |
+| Total cost (USD) | $0.20 |
+
+Per task (passes / runs):
+
+| Task | v0 |
+| --- | --- |
+| node-script | 5/5 |
+| device-login | 5/5 |
+
+Why runs failed:
+
+None.
 
 ## How to read this
 
