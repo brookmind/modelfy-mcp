@@ -9,7 +9,9 @@ import {
 import { ActsAsSchema, AgentLayerSchema } from "./props";
 
 const KEY_TTL_SECONDS = 30 * 24 * 60 * 60;
-const DEFAULT_KEYS_PER_IP_PER_HOUR = 5;
+const PRODUCTION_URL = "https://mcp.modelfy.ai";
+/** Where the agent evals run: they ask for many keys from one address */
+const EVALS_URL = "https://mcp-dev.modelfy.ai";
 /** All addresses together get this many times one address's hourly keys in a UTC day */
 const DAILY_TOTAL_FACTOR = 20;
 
@@ -32,18 +34,14 @@ const CreateBodySchema = z.object({
   agent_layer: AgentLayerSchema.optional(),
 });
 
-/** The bare agent layer is for evals: only where the Worker allows it. */
-export function bareLayerAllowed(setting: string | undefined): boolean {
-  return setting === "true";
+/** The bare agent layer is for evals: never in production. */
+export function bareLayerAllowed(publicUrl: string): boolean {
+  return publicUrl !== PRODUCTION_URL;
 }
 
-/** A limit from the Worker's vars: a positive whole number, or the default. */
-export function limitSetting(
-  setting: string | undefined,
-  fallback: number,
-): number {
-  const value = Number.parseInt(setting ?? "", 10);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
+/** Sandbox keys one address may get in an hour. */
+export function sandboxKeysPerHour(publicUrl: string): number {
+  return publicUrl === EVALS_URL ? 200 : 5;
 }
 
 function tooMany(description: string, retryAfter: number): Response {
@@ -110,16 +108,10 @@ export async function createSandboxKey(
 ): Promise<Response> {
   const options = await readOptions(request);
   if (options instanceof Response) return options;
-  if (
-    options.agent_layer === "bare" &&
-    !bareLayerAllowed(env.ALLOW_BARE_AGENT_LAYER)
-  ) {
+  if (options.agent_layer === "bare" && !bareLayerAllowed(env.PUBLIC_URL)) {
     return invalidRequest('agent_layer "bare" is not available here.');
   }
-  const perHour = limitSetting(
-    env.SANDBOX_KEYS_PER_HOUR,
-    DEFAULT_KEYS_PER_IP_PER_HOUR,
-  );
+  const perHour = sandboxKeysPerHour(env.PUBLIC_URL);
   const wait = await keyRequestWait(env, request, "sandbox-keys", perHour);
   if (wait > 0) {
     return tooMany(
