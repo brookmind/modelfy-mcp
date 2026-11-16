@@ -6,7 +6,7 @@ import {
   createSandboxKey,
   limitSetting,
 } from "../../src/auth/sandbox-keys";
-import { limitAddress } from "../../src/limits";
+import { limitAddress, secondsToUtcMidnight } from "../../src/limits";
 import { call, connect, json, mockApi } from "../helpers/worker";
 
 const LIVE = `mfy_live_${"L".repeat(43)}`;
@@ -421,5 +421,33 @@ describe("sandbox key options", () => {
 
     expect(refused.status).toBe(429);
     expect(await refused.json()).toMatchObject({ error: "rate_limited" });
+    // The wait is the time left until 00:00 UTC
+    expect(Number(refused.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(Number(refused.headers.get("Retry-After"))).toBeLessThanOrEqual(
+      24 * 60 * 60,
+    );
+  });
+
+  it("a counter write that KV refuses still gives the key, not a 500", async () => {
+    // The test before used up the day's total
+    const day = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    await env.OAUTH_KV.delete(`limit:sandbox-keys-all:${day}`);
+    const put = env.OAUTH_KV.put.bind(env.OAUTH_KV);
+    vi.spyOn(env.OAUTH_KV, "put").mockImplementation((key, value, options) =>
+      key.startsWith("limit:")
+        ? Promise.reject(new Error("KV PUT failed: 429 Too Many Requests"))
+        : put(key, value, options),
+    );
+
+    const response = await sandboxKey("203.0.113.91");
+
+    expect(response.status).toBe(200);
+  });
+
+  it.each([
+    [Date.UTC(2026, 10, 16, 23, 59, 30), 30],
+    [Date.UTC(2026, 10, 16, 0, 0, 0), 24 * 60 * 60],
+  ])("at %d the daily windows restart in %d s", (now, seconds) => {
+    expect(secondsToUtcMidnight(now)).toBe(seconds);
   });
 });
