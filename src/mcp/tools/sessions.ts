@@ -154,9 +154,12 @@ async function imageContent(
   status: SessionStatus,
 ): Promise<CallToolResult["content"]> {
   const images = await Promise.all(
-    status.photos
-      .slice(0, MAX_IMAGES)
-      .map((photo) => smallImage(photo.preview_url ?? photo.url)),
+    status.photos.slice(0, MAX_IMAGES).map(async (photo) => {
+      const preview =
+        photo.preview_url !== null ? await smallImage(photo.preview_url) : [];
+      // No preview, or one that cannot be shown: the photo itself, if small
+      return preview.length > 0 ? preview : smallImage(photo.url);
+    }),
   );
   return images.flat();
 }

@@ -13,6 +13,11 @@ const STATES: Record<
   CANCELLED: "cancelled",
 };
 
+/** The API's preview link; an API without previews sends none (or nothing useful). */
+function previewOf(url: string | null | undefined): string | null {
+  return url === undefined || url === "" ? null : url;
+}
+
 export function toSessionStatus(
   detail: z.infer<typeof ShootDetailSchema>,
   webUrl: string,
@@ -24,7 +29,7 @@ export function toSessionStatus(
           {
             photo_id: shot.media.id,
             url: shot.media.url,
-            preview_url: shot.media.previewUrl ?? null,
+            preview_url: previewOf(shot.media.previewUrl),
             product: names.get(shot.itemId) ?? null,
           },
         ]

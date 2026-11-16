@@ -91,7 +91,7 @@ Calling it again with the same `quote_id` returns the same session; it never cha
 
 ## 5. Wait and show
 
-`get_photo_session` with `session_id` and `wait_seconds` (up to 45) waits until the session finishes. If it is still `running`, call it again. When done, it returns every photo's link (`url`, full size) and a `preview_url` (a small JPEG, when Modelfy has one), and up to four previews as images the chat can show.
+`get_photo_session` with `session_id` and `wait_seconds` (up to 45) waits until the session finishes. If it is still `running`, call it again. When done, it returns every photo's link (`url`, full size) and a `preview_url` (a small JPEG, when Modelfy has one), and up to four of them as images the chat can show (the preview, or the photo itself when it is under 1 MB).
 
 | Status      | Meaning                                                             |
 | ----------- | ------------------------------------------------------------------- |

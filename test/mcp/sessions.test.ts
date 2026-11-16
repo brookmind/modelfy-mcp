@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { ShootDetailSchema } from "../../src/backend/api-schemas";
+import { toSessionStatus } from "../../src/backend/session-status";
 import {
   connect,
   json,
@@ -532,6 +534,62 @@ describe("plan, generate and follow photo sessions", () => {
       url: "https://cdn.test/photo-0.jpg",
       preview_url: "https://cdn.test/cdn-cgi/image/width=1024/photo-0.jpg",
     });
+  });
+
+  it.each([
+    ["sends no previewUrl", {}],
+    ["sends a null previewUrl", { previewUrl: null }],
+    ["sends an empty previewUrl", { previewUrl: "" }],
+  ])("an API that %s gives preview_url null", (_label, extra) => {
+    const detail = ShootDetailSchema.parse({
+      id: "shoot-1",
+      name: "Linen dress",
+      status: "COMPLETED",
+      counts: { queued: 0, running: 0, succeeded: 1, failed: 0, cancelled: 0 },
+      credits: { reserved: 20, charged: 20, refunded: 0 },
+      items: [{ id: "item-1", name: "Linen dress" }],
+      shots: [
+        {
+          itemId: "item-1",
+          status: "SUCCEEDED",
+          media: {
+            id: "media-0",
+            url: "https://cdn.test/photo-0.jpg",
+            ...extra,
+          },
+        },
+      ],
+    });
+
+    expect(toSessionStatus(detail, "https://web.test").photos).toEqual([
+      {
+        photo_id: "media-0",
+        url: "https://cdn.test/photo-0.jpg",
+        preview_url: null,
+        product: "Linen dress",
+      },
+    ]);
+  });
+
+  it("a preview that cannot be shown falls back to the photo itself", async () => {
+    mockApi(sessionsApi(), (request) =>
+      request.url.includes("/cdn-cgi/image/")
+        ? new Response(null, { status: 404 })
+        : cdn(),
+    );
+    const client = await connect(LIVE);
+
+    const result = await client.callTool({
+      name: "get_photo_session",
+      arguments: { session_id: "shoot-1" },
+    });
+
+    expect(
+      z
+        .array(z.object({ type: z.string() }))
+        .parse(result.content)
+        .filter((part) => part.type === "image").length,
+    ).toBeGreaterThan(0);
   });
 
   it("a photo that declares more than 1 MB stays a link and is not downloaded", async () => {
