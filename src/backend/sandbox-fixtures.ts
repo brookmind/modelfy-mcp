@@ -1,4 +1,20 @@
+import { DEMO_TEE_BACK_PNG, DEMO_TEE_FRONT_PNG } from "../sandbox-demo-assets";
 import type { Background, Model, PhotoOptions } from "./types";
+
+const DEMO_IMAGES: Partial<Record<string, string>> = {
+  "tee-front.png": DEMO_TEE_FRONT_PNG,
+  "tee-back.png": DEMO_TEE_BACK_PNG,
+};
+
+/** The demo product's photo files, served under /sandbox/demo/. */
+export const DEMO_IMAGE_FILES = Object.keys(DEMO_IMAGES);
+
+/** A demo product photo by file name, or null for anything else. */
+export function demoImage(name: string): Uint8Array | null {
+  const base64 = DEMO_IMAGES[name];
+  if (base64 === undefined) return null;
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
 
 /** Used only when the real catalog cannot be read (for example locally). */
 export const SANDBOX_MODELS: Model[] = [

@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import type { Describe } from "../layer";
 import { guarded, respond, type Session } from "../session";
 
 const NoInput = z.object({});
@@ -11,27 +12,35 @@ const BudgetOut = z.object({
   resetsAt: z.string(),
 });
 
-const AccountOut = z.object({
-  credits: z.number().describe("Credits available now"),
-  plan: z.string().nullable(),
-  creditsPerPhoto: z.number().nullable(),
-  keyKind: z.enum(["oauth", "live", "test", "anonymous"]),
-  sandbox: z.boolean().describe("True for test keys: nothing is spent"),
-  budget: BudgetOut.nullable().describe("Live keys only"),
-});
+// Schema builders take the layer's describe and return the exact zod type,
+// which only inference can spell (module-private)
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- see above
+function accountOut(d: Describe) {
+  return z.object({
+    credits: d(z.number(), "Credits available now"),
+    plan: z.string().nullable(),
+    creditsPerPhoto: z.number().nullable(),
+    keyKind: z.enum(["oauth", "live", "test", "anonymous"]),
+    sandbox: d(z.boolean(), "True for test keys: nothing is spent"),
+    budget: d(BudgetOut.nullable(), "Live keys only"),
+  });
+}
 
-const ModelsOut = z.object({
-  models: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      source: z.enum(["own", "modelfy"]),
-      ready: z.boolean().describe("Only ready models can be used"),
-      age: z.number().nullable(),
-      photoUrl: z.string().nullable(),
-    }),
-  ),
-});
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- schema builder
+function modelsOut(d: Describe) {
+  return z.object({
+    models: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        source: z.enum(["own", "modelfy"]),
+        ready: d(z.boolean(), "Only ready models can be used"),
+        age: z.number().nullable(),
+        photoUrl: z.string().nullable(),
+      }),
+    ),
+  });
+}
 
 const BackgroundsOut = z.object({
   backgrounds: z.array(
@@ -73,14 +82,17 @@ export function registerAccountTools(
   server: McpServer,
   session: Session,
 ): void {
+  const { layer } = session;
   server.registerTool(
     "get_account",
     {
       title: "Modelfy account",
-      description:
+      description: layer.tool(
+        "get_account",
         "The account's credits, plan and price per photo. For a live API key also its budget and what it spent today; for test keys, sandbox: true. Free.",
+      ),
       inputSchema: NoInput,
-      outputSchema: AccountOut,
+      outputSchema: accountOut(layer.describe),
       annotations: READ_ONLY,
     },
     () =>
@@ -97,10 +109,12 @@ export function registerAccountTools(
     "list_models",
     {
       title: "Models",
-      description:
+      description: layer.tool(
+        "list_models",
         "People who can wear or hold the product: the account's own models and Modelfy's ready-made ones. Use their ids in plan_photos (model_ids). Free.",
+      ),
       inputSchema: NoInput,
-      outputSchema: ModelsOut,
+      outputSchema: modelsOut(layer.describe),
       annotations: READ_ONLY,
     },
     () =>
@@ -114,8 +128,10 @@ export function registerAccountTools(
     "list_backgrounds",
     {
       title: "Backgrounds",
-      description:
+      description: layer.tool(
+        "list_backgrounds",
         "Real places for a photo session: the account's own and Modelfy's gallery. Use an id in plan_photos (background_id), or describe a place instead. Free.",
+      ),
       inputSchema: NoInput,
       outputSchema: BackgroundsOut,
       annotations: READ_ONLY,
@@ -131,8 +147,10 @@ export function registerAccountTools(
     "get_photo_options",
     {
       title: "Photo options",
-      description:
+      description: layer.tool(
+        "get_photo_options",
         "What a photo session accepts: aspect ratios, photos per product, shot types, resolutions and qualities (they change the price), outfit styles. Free.",
+      ),
       inputSchema: NoInput,
       outputSchema: OptionsOut,
       annotations: READ_ONLY,

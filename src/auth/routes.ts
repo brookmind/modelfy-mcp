@@ -196,6 +196,8 @@ export async function callback(
     apiToken: redeemed.token,
     sandboxId: null,
     budget: null,
+    actsAs: null,
+    agentLayer: "v0",
   };
   const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
     request: authRequest,

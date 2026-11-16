@@ -1,0 +1,1269 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the v0 agent layer > keeps today's instructions, tools and descriptions 1`] = `
+{
+  "instructions": "Modelfy creates product photos: a product on a model in a real place, or on a plain studio background.
+
+Workflow:
+1. Get the product photos in: add_product_photos (public image URLs), or create_upload_session (upload from code, or a page a person opens to drop photos). Use the upload ids it returns.
+2. Look at the choices: list_models (people who wear or hold the product), list_backgrounds (places), get_photo_options (formats, photos per product, shot types).
+3. plan_photos: always set aspect_ratio and photos_per_product (ask the person if they did not say). It returns the exact credits and a quote_id. Nothing is spent.
+4. generate_photos with the quote_id.
+5. get_photo_session with wait_seconds until it is done, then show the photos.
+
+Rules: never invent model, background or upload ids; use the ids the tools return. Send image bytes from code, never as base64 through the model. Reply in the person's language.
+
+Docs: get_docs has the full guide (topics: quickstart, connect, keys, photos, credits, errors). After an error, follow its next_step; get_docs with topic "errors" explains every code.
+
+Sandbox: this is a test key. Nothing is spent and the photos are samples marked SANDBOX. Use it to build and try an integration, then switch to a live key.",
+  "tools": [
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "The account's credits, plan and price per photo. For a live API key also its budget and what it spent today; for test keys, sandbox: true. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {},
+        "type": "object",
+      },
+      "name": "get_account",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "maxCreditsPerDay": {
+                    "type": "number",
+                  },
+                  "maxCreditsPerSession": {
+                    "type": "number",
+                  },
+                  "resetsAt": {
+                    "type": "string",
+                  },
+                  "spentToday": {
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "maxCreditsPerSession",
+                  "maxCreditsPerDay",
+                  "spentToday",
+                  "resetsAt",
+                ],
+                "type": "object",
+              },
+              {
+                "type": "null",
+              },
+            ],
+            "description": "Live keys only",
+          },
+          "credits": {
+            "description": "Credits available now",
+            "type": "number",
+          },
+          "creditsPerPhoto": {
+            "type": [
+              "number",
+              "null",
+            ],
+          },
+          "keyKind": {
+            "enum": [
+              "oauth",
+              "live",
+              "test",
+              "anonymous",
+            ],
+            "type": "string",
+          },
+          "plan": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "sandbox": {
+            "description": "True for test keys: nothing is spent",
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "credits",
+          "plan",
+          "creditsPerPhoto",
+          "keyKind",
+          "sandbox",
+          "budget",
+        ],
+        "type": "object",
+      },
+      "title": "Modelfy account",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "People who can wear or hold the product: the account's own models and Modelfy's ready-made ones. Use their ids in plan_photos (model_ids). Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {},
+        "type": "object",
+      },
+      "name": "list_models",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "models": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "age": {
+                  "type": [
+                    "number",
+                    "null",
+                  ],
+                },
+                "id": {
+                  "type": "string",
+                },
+                "name": {
+                  "type": "string",
+                },
+                "photoUrl": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "ready": {
+                  "description": "Only ready models can be used",
+                  "type": "boolean",
+                },
+                "source": {
+                  "enum": [
+                    "own",
+                    "modelfy",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "name",
+                "source",
+                "ready",
+                "age",
+                "photoUrl",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "models",
+        ],
+        "type": "object",
+      },
+      "title": "Models",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "Real places for a photo session: the account's own and Modelfy's gallery. Use an id in plan_photos (background_id), or describe a place instead. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {},
+        "type": "object",
+      },
+      "name": "list_backgrounds",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "backgrounds": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "id": {
+                  "type": "string",
+                },
+                "name": {
+                  "type": "string",
+                },
+                "photoUrl": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "ready": {
+                  "type": "boolean",
+                },
+                "source": {
+                  "enum": [
+                    "own",
+                    "gallery",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "name",
+                "source",
+                "description",
+                "ready",
+                "photoUrl",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "backgrounds",
+        ],
+        "type": "object",
+      },
+      "title": "Backgrounds",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "What a photo session accepts: aspect ratios, photos per product, shot types, resolutions and qualities (they change the price), outfit styles. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {},
+        "type": "object",
+      },
+      "name": "get_photo_options",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "aspectRatios": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "defaults": {
+            "additionalProperties": false,
+            "properties": {
+              "quality": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "resolution": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+            },
+            "required": [
+              "resolution",
+              "quality",
+            ],
+            "type": "object",
+          },
+          "maxModels": {
+            "type": "number",
+          },
+          "outfitStyles": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "photosPerProduct": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "type": "number",
+              },
+              "max": {
+                "type": "number",
+              },
+              "min": {
+                "type": "number",
+              },
+            },
+            "required": [
+              "min",
+              "max",
+              "default",
+            ],
+            "type": "object",
+          },
+          "qualities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "resolutions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "shotTypes": {
+            "additionalProperties": false,
+            "properties": {
+              "withModel": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "withoutModel": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "required": [
+              "withModel",
+              "withoutModel",
+            ],
+            "type": "object",
+          },
+        },
+        "required": [
+          "aspectRatios",
+          "photosPerProduct",
+          "shotTypes",
+          "resolutions",
+          "qualities",
+          "defaults",
+          "outfitStyles",
+          "maxModels",
+        ],
+        "type": "object",
+      },
+      "title": "Photo options",
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": false,
+      },
+      "description": "Downloads product photos from public image links (for example the store's product page images) and returns upload ids for plan_photos. Free. For files on a computer or phone use create_upload_session.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "image_urls": {
+            "description": "Public links to the product's image files (the front first). Not web pages: the image itself.",
+            "items": {
+              "format": "uri",
+              "type": "string",
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "type": "array",
+          },
+        },
+        "required": [
+          "image_urls",
+        ],
+        "type": "object",
+      },
+      "name": "add_product_photos",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "photos": {
+            "items": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "source_url": {
+                      "type": "string",
+                    },
+                    "upload_id": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "source_url",
+                    "upload_id",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                    },
+                    "source_url": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "source_url",
+                    "error",
+                  ],
+                  "type": "object",
+                },
+              ],
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "photos",
+        ],
+        "type": "object",
+      },
+      "title": "Add product photos from links",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": false,
+      },
+      "description": "For photos that are not online. Returns (1) page_url: a page a person opens (signed in to Modelfy) to drop photos, for chat assistants; (2) for each announced file, a presigned PUT your code sends the bytes to (never send image bytes through the model). Then call get_uploaded_photos. Free; up to 10 files; valid 1 hour.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "files": {
+            "default": [],
+            "description": "Files your code will upload: each gets a presigned PUT. Leave empty when a person will use the page.",
+            "items": {
+              "properties": {
+                "bytes": {
+                  "description": "File size in bytes",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "content_type": {
+                  "description": "image/jpeg, image/png, image/webp, image/heic",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "content_type",
+                "bytes",
+              ],
+              "type": "object",
+            },
+            "maxItems": 10,
+            "type": "array",
+          },
+        },
+        "type": "object",
+      },
+      "name": "create_upload_session",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "type": "string",
+          },
+          "page_url": {
+            "description": "A page a signed-in person opens to drop photos",
+            "type": "string",
+          },
+          "session_id": {
+            "type": "string",
+          },
+          "uploads": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "put_url": {
+                  "type": "string",
+                },
+                "upload_id": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "upload_id",
+                "put_url",
+                "headers",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "session_id",
+          "page_url",
+          "expires_at",
+          "uploads",
+        ],
+        "type": "object",
+      },
+      "title": "Upload product photos",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "Confirms what has arrived in an upload session: ready upload ids for plan_photos, files still pending, and rejected files with the reason. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "session_id": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "session_id",
+        ],
+        "type": "object",
+      },
+      "name": "get_uploaded_photos",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "pending": {
+            "type": "number",
+          },
+          "ready_upload_ids": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "rejected": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "type": "string",
+                },
+                "upload_id": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "upload_id",
+                "reason",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "ready_upload_ids",
+          "pending",
+          "rejected",
+        ],
+        "type": "object",
+      },
+      "title": "Uploaded photos",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "Plans a photo session and returns its exact price in credits and a quote_id for generate_photos. Nothing is spent. aspect_ratio and photos_per_product are required: ask the person if they did not say.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "aspect_ratio": {
+            "description": "One of get_photo_options aspectRatios, e.g. 4:5. Ask the person if they did not say",
+            "type": "string",
+          },
+          "background_color": {
+            "description": "Studio only, in words: white, light grey…",
+            "maxLength": 30,
+            "type": "string",
+          },
+          "background_id": {
+            "description": "From list_backgrounds",
+            "type": "string",
+          },
+          "direction": {
+            "description": "Creative direction in the person's words",
+            "maxLength": 500,
+            "type": "string",
+          },
+          "locale": {
+            "default": "en",
+            "description": "The person's language, e.g. en, es",
+            "type": "string",
+          },
+          "mode": {
+            "default": "place",
+            "description": "place: a real place (needs background_id or place_description); studio: a plain color background",
+            "enum": [
+              "place",
+              "studio",
+            ],
+            "type": "string",
+          },
+          "model_ids": {
+            "description": "From list_models; empty for product-only photos",
+            "items": {
+              "type": "string",
+            },
+            "maxItems": 3,
+            "type": "array",
+          },
+          "outfit": {
+            "description": "What the model wears",
+            "properties": {
+              "note": {
+                "maxLength": 200,
+                "type": "string",
+              },
+              "style": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "photos_per_product": {
+            "description": "Ask the person if they did not say",
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer",
+          },
+          "place_description": {
+            "description": "Or describe a real place in words",
+            "maxLength": 300,
+            "type": "string",
+          },
+          "products": {
+            "items": {
+              "properties": {
+                "description": {
+                  "maxLength": 500,
+                  "type": "string",
+                },
+                "name": {
+                  "maxLength": 80,
+                  "type": "string",
+                },
+                "upload_ids": {
+                  "description": "From add_product_photos or get_uploaded_photos; the front first, then an optional detail",
+                  "items": {
+                    "type": "string",
+                  },
+                  "maxItems": 2,
+                  "minItems": 1,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "upload_ids",
+              ],
+              "type": "object",
+            },
+            "minItems": 1,
+            "type": "array",
+          },
+          "quality": {
+            "type": "string",
+          },
+          "resolution": {
+            "type": "string",
+          },
+          "shot_types": {
+            "items": {
+              "enum": [
+                "close-up",
+                "medium-shot",
+                "full-body",
+                "wide-shot",
+                "detail",
+                "flat-lay",
+                "still-life",
+                "hanger",
+                "ghost-mannequin",
+              ],
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "products",
+          "aspect_ratio",
+          "photos_per_product",
+        ],
+        "type": "object",
+      },
+      "name": "plan_photos",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "type": "number",
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "left_today": {
+                    "type": "number",
+                  },
+                  "session_limit": {
+                    "type": "number",
+                  },
+                },
+                "required": [
+                  "session_limit",
+                  "left_today",
+                ],
+                "type": "object",
+              },
+              {
+                "type": "null",
+              },
+            ],
+            "description": "Live keys only",
+          },
+          "credits": {
+            "type": "number",
+          },
+          "enough_credits": {
+            "type": "boolean",
+          },
+          "expires_at": {
+            "type": "string",
+          },
+          "mood": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "photos": {
+            "type": "number",
+          },
+          "quote_id": {
+            "type": "string",
+          },
+          "with_model": {
+            "type": "number",
+          },
+          "without_model": {
+            "type": "number",
+          },
+        },
+        "required": [
+          "quote_id",
+          "expires_at",
+          "credits",
+          "photos",
+          "with_model",
+          "without_model",
+          "enough_credits",
+          "balance",
+          "budget",
+          "mood",
+        ],
+        "type": "object",
+      },
+      "title": "Plan a photo session",
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+      },
+      "description": "Launches the session planned by plan_photos (spends its credits; failed photos are refunded). Needs the quote_id. When a person is in the conversation, show them the price and set user_confirmed: true only after they agree. Then follow it with get_photo_session.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+          },
+          "user_confirmed": {
+            "description": "True only after the person said yes to this exact price",
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "quote_id",
+        ],
+        "type": "object",
+      },
+      "name": "generate_photos",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "credits": {
+            "additionalProperties": false,
+            "properties": {
+              "charged": {
+                "type": "number",
+              },
+              "refunded": {
+                "type": "number",
+              },
+              "reserved": {
+                "type": "number",
+              },
+            },
+            "required": [
+              "reserved",
+              "charged",
+              "refunded",
+            ],
+            "type": "object",
+          },
+          "done": {
+            "type": "number",
+          },
+          "failed": {
+            "type": "number",
+          },
+          "name": {
+            "type": "string",
+          },
+          "photos": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "photo_id": {
+                  "type": "string",
+                },
+                "product": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "url": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "photo_id",
+                "url",
+                "product",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "session_id": {
+            "type": "string",
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "partial",
+              "failed",
+              "cancelled",
+            ],
+            "type": "string",
+          },
+          "total": {
+            "type": "number",
+          },
+          "web_url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "session_id",
+          "name",
+          "status",
+          "total",
+          "done",
+          "failed",
+          "credits",
+          "photos",
+          "web_url",
+        ],
+        "type": "object",
+      },
+      "title": "Generate the planned photos",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "A session's progress and its finished photos (shown as images when small enough, always with links). wait_seconds (up to 45) waits until it finishes. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "session_id": {
+            "type": "string",
+          },
+          "wait_seconds": {
+            "default": 0,
+            "maximum": 45,
+            "minimum": 0,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "session_id",
+        ],
+        "type": "object",
+      },
+      "name": "get_photo_session",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "credits": {
+            "additionalProperties": false,
+            "properties": {
+              "charged": {
+                "type": "number",
+              },
+              "refunded": {
+                "type": "number",
+              },
+              "reserved": {
+                "type": "number",
+              },
+            },
+            "required": [
+              "reserved",
+              "charged",
+              "refunded",
+            ],
+            "type": "object",
+          },
+          "done": {
+            "type": "number",
+          },
+          "failed": {
+            "type": "number",
+          },
+          "name": {
+            "type": "string",
+          },
+          "photos": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "photo_id": {
+                  "type": "string",
+                },
+                "product": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "url": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "photo_id",
+                "url",
+                "product",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "session_id": {
+            "type": "string",
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "partial",
+              "failed",
+              "cancelled",
+            ],
+            "type": "string",
+          },
+          "total": {
+            "type": "number",
+          },
+          "web_url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "session_id",
+          "name",
+          "status",
+          "total",
+          "done",
+          "failed",
+          "credits",
+          "photos",
+          "web_url",
+        ],
+        "type": "object",
+      },
+      "title": "Photo session status",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "The latest photos of the account, newest first, optionally of one session. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "limit": {
+            "default": 10,
+            "maximum": 30,
+            "minimum": 1,
+            "type": "integer",
+          },
+          "session_id": {
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "name": "list_recent_photos",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "photos": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                },
+                "photo_id": {
+                  "type": "string",
+                },
+                "session_id": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "session_name": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "url": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "photo_id",
+                "url",
+                "created_at",
+                "session_id",
+                "session_name",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "photos",
+        ],
+        "type": "object",
+      },
+      "title": "Recent photos",
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+      },
+      "description": "Stops a running session. Photos not started yet are cancelled and their credits refunded; finished photos stay.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "session_id": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "session_id",
+        ],
+        "type": "object",
+      },
+      "name": "cancel_photo_session",
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "credits": {
+            "additionalProperties": false,
+            "properties": {
+              "charged": {
+                "type": "number",
+              },
+              "refunded": {
+                "type": "number",
+              },
+              "reserved": {
+                "type": "number",
+              },
+            },
+            "required": [
+              "reserved",
+              "charged",
+              "refunded",
+            ],
+            "type": "object",
+          },
+          "done": {
+            "type": "number",
+          },
+          "failed": {
+            "type": "number",
+          },
+          "name": {
+            "type": "string",
+          },
+          "photos": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "photo_id": {
+                  "type": "string",
+                },
+                "product": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "url": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "photo_id",
+                "url",
+                "product",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "session_id": {
+            "type": "string",
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "partial",
+              "failed",
+              "cancelled",
+            ],
+            "type": "string",
+          },
+          "total": {
+            "type": "number",
+          },
+          "web_url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "session_id",
+          "name",
+          "status",
+          "total",
+          "done",
+          "failed",
+          "credits",
+          "photos",
+          "web_url",
+        ],
+        "type": "object",
+      },
+      "title": "Cancel a photo session",
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true,
+      },
+      "description": "Modelfy's documentation as Markdown: how to connect, keys, the photo workflow, credits and consent, and what each error code means and how to fix it. Read it when unsure how to do something or after an error. Free.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "topic": {
+            "description": "One of: quickstart, connect, keys, photos, credits, errors. Leave it out for the list of topics.",
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "name": "get_docs",
+      "title": "Modelfy docs",
+    },
+  ],
+}
+`;

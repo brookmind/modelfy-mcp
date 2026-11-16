@@ -8,10 +8,22 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": { "enabled": true },
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "local-oauth-kv" }],
+  // Calls per anonymous sandbox key (counted per Cloudflare location, no KV
+  // writes); namespace ids are unique per account, so each env has its own
+  "ratelimits": [
+    {
+      "name": "ANON_CALLS",
+      "namespace_id": "4100",
+      "simple": { "limit": 60, "period": 60 },
+    },
+  ],
   "vars": {
     "API_URL": "http://localhost:3000",
     "WEB_URL": "http://localhost:5173",
     "PUBLIC_URL": "http://localhost:8787",
+    // Evals only: sandbox keys with the bare agent layer (never in production)
+    "ALLOW_BARE_AGENT_LAYER": "true",
+    "SANDBOX_KEYS_PER_HOUR": "5",
   },
   "env": {
     "dev": {
@@ -19,10 +31,19 @@
       "kv_namespaces": [
         { "binding": "OAUTH_KV", "id": "fb46029047e94a688e631bb5ba20480c" },
       ],
+      "ratelimits": [
+        {
+          "name": "ANON_CALLS",
+          "namespace_id": "4101",
+          "simple": { "limit": 60, "period": 60 },
+        },
+      ],
       "vars": {
         "API_URL": "https://api-dev.modelfy.ai",
         "WEB_URL": "https://beta-dev.modelfy.ai",
         "PUBLIC_URL": "https://mcp-dev.modelfy.ai",
+        "ALLOW_BARE_AGENT_LAYER": "true",
+        "SANDBOX_KEYS_PER_HOUR": "200",
       },
     },
     "production": {
@@ -30,10 +51,19 @@
       "kv_namespaces": [
         { "binding": "OAUTH_KV", "id": "TO_BE_CREATED_PRODUCTION" },
       ],
+      "ratelimits": [
+        {
+          "name": "ANON_CALLS",
+          "namespace_id": "4102",
+          "simple": { "limit": 60, "period": 60 },
+        },
+      ],
       "vars": {
         "API_URL": "https://api.modelfy.ai",
         "WEB_URL": "https://beta.modelfy.ai",
         "PUBLIC_URL": "https://mcp.modelfy.ai",
+        "ALLOW_BARE_AGENT_LAYER": "false",
+        "SANDBOX_KEYS_PER_HOUR": "5",
       },
     },
   },

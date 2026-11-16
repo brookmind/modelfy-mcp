@@ -2,13 +2,11 @@ import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import { parseProps } from "../auth/props";
 import { sha256Hex } from "../crypto";
-import { hourlyLimit } from "../limits";
 import { backendFor } from "../backend";
 import type { AppEnv } from "../env";
+import { layerText } from "./layer";
 import { buildServer } from "./server";
 import type { Session } from "./session";
-
-const ANONYMOUS_CALLS_PER_HOUR = 300;
 
 const GrantAuth = z.object({ token: z.string(), userId: z.string() });
 
@@ -40,19 +38,15 @@ export const mcpApiHandler = {
       props.sandboxId ?? `token:${await sha256Hex(props.apiToken ?? "")}`;
     if (
       props.kind === "anonymous" &&
-      !(await hourlyLimit(
-        env.OAUTH_KV,
-        `anon-calls:${owner}`,
-        ANONYMOUS_CALLS_PER_HOUR,
-      ))
+      !(await env.ANON_CALLS.limit({ key: owner })).success
     ) {
       return Response.json(
         {
           error: "rate_limited",
           error_description:
-            "This anonymous sandbox key made 300 calls in the last hour. Wait, or use device login for your own key.",
+            "This anonymous sandbox key made more than 60 calls in a minute. Wait a minute, or use device login for your own key.",
         },
-        { status: 429, headers: { "Retry-After": "3600" } },
+        { status: 429, headers: { "Retry-After": "60" } },
       );
     }
     const auth: unknown = Reflect.get(ctx, "auth");
@@ -61,6 +55,7 @@ export const mcpApiHandler = {
       env,
       owner,
       backend: backendFor(props, env, owner),
+      layer: layerText(props.agentLayer),
       revoke: () => revokeConnection(env, auth),
     };
     const handler = createMcpHandler(() => buildServer(session), {

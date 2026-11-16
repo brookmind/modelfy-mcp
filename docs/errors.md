@@ -73,7 +73,7 @@ Modelfy could not complete the request. Try again in a moment; if it keeps faili
 
 ## HTTP errors of the endpoint
 
-| Status | Body                         | Meaning                                                                                                      |
-| ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `401`  | `{"error": "invalid_token"}` | Missing, wrong, expired or revoked token. OAuth clients refresh or sign in again; with an API key, check it. |
-| `429`  | `{"error": "rate_limited"}`  | An anonymous sandbox key made 300 calls in the last hour. Wait, or get your own key with device login.       |
+| Status | Body                         | Meaning                                                                                                             |
+| ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `401`  | `{"error": "invalid_token"}` | Missing, wrong, expired or revoked token. OAuth clients refresh or sign in again; with an API key, check it.        |
+| `429`  | `{"error": "rate_limited"}`  | An anonymous sandbox key made more than 60 calls in a minute. Wait a minute, or get your own key with device login. |

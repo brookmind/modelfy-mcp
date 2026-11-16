@@ -4,7 +4,11 @@ import {
   readUploadState,
   writeUploadState,
 } from "./backend/sandbox-backend";
-import { samplePhotoSvg } from "./backend/sandbox-fixtures";
+import {
+  DEMO_IMAGE_FILES,
+  demoImage,
+  samplePhotoSvg,
+} from "./backend/sandbox-fixtures";
 
 const MAX_BYTES = 15 * 1024 * 1024;
 
@@ -15,6 +19,28 @@ function html(status: number, body: string): Response {
   );
 }
 
+/** A product page to try "photos from a product link" in the sandbox. */
+function demoRoute(name: string, publicUrl: string): Response | null {
+  if (name === "product") {
+    const images = DEMO_IMAGE_FILES.map(
+      (file) =>
+        `<img src="${publicUrl}/sandbox/demo/${file}" alt="Linen T-shirt" width="240" height="300">`,
+    ).join("");
+    return html(
+      200,
+      `<h1>Linen T-shirt</h1><p>€29</p><p>A relaxed T-shirt in washed linen, sand colour. Sizes XS to XL.</p>${images}<p><small>Modelfy sandbox demo product.</small></p>`,
+    );
+  }
+  const image = demoImage(name);
+  if (image === null) return null;
+  return new Response(image, {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=86400",
+    },
+  });
+}
+
 /** Routes of the sandbox's fake storage and sample photos (design §7). */
 export async function sandboxRoute(
   request: Request,
@@ -23,6 +49,10 @@ export async function sandboxRoute(
   const { pathname } = new URL(request.url);
   const parts = pathname.split("/").filter((part) => part !== "");
   if (parts[0] !== "sandbox") return null;
+
+  if (request.method === "GET" && parts[1] === "demo" && parts.length === 3) {
+    return demoRoute(parts[2] ?? "", env.PUBLIC_URL);
+  }
 
   if (request.method === "GET" && parts[1] === "photos" && parts.length === 3) {
     const index = Number.parseInt(parts[2] ?? "", 10);

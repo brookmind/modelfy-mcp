@@ -11,11 +11,11 @@ export const SERVER_VERSION = "0.1.0";
 export function buildServer(session: Session): McpServer {
   const server = new McpServer(
     { name: "modelfy", title: "Modelfy", version: SERVER_VERSION },
-    { instructions: instructionsFor(session.props.kind) },
+    session.layer.docs ? { instructions: instructionsFor(session.props) } : {},
   );
   registerAccountTools(server, session);
   registerPhotoInputTools(server, session);
   registerSessionTools(server, session);
-  registerDocs(server, session);
+  if (session.layer.docs) registerDocs(server, session);
   return server;
 }

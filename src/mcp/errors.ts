@@ -114,17 +114,26 @@ export function toAgentError(error: unknown): AgentError {
   );
 }
 
-/** The tool result of an error: the sentence for the model and the JSON for code. */
+/**
+ * The tool result of an error: the sentence for the model and the JSON for
+ * code. Without guidance (the bare agent layer) only the code and message.
+ */
 export function errorResult(
   error: AgentError,
   publicUrl: string,
+  withGuidance = true,
 ): CallToolResult {
+  const guidance = withGuidance
+    ? {
+        next_step: error.nextStep,
+        docs_url: `${publicUrl}/docs/errors#${error.code}`,
+      }
+    : {};
   const payload = {
     error: {
       code: error.code,
       message: error.message,
-      next_step: error.nextStep,
-      docs_url: `${publicUrl}/docs/errors#${error.code}`,
+      ...guidance,
       ...(error.details ?? {}),
     },
   };
@@ -133,7 +142,9 @@ export function errorResult(
     content: [
       {
         type: "text",
-        text: `${error.code}: ${error.message} Next step: ${error.nextStep}`,
+        text: withGuidance
+          ? `${error.code}: ${error.message} Next step: ${error.nextStep}`
+          : `${error.code}: ${error.message}`,
       },
       { type: "text", text: JSON.stringify(payload) },
     ],

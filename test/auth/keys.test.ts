@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { call, json, mockApi } from "../helpers/worker";
+import { env } from "cloudflare:workers";
+import {
+  bareLayerAllowed,
+  createSandboxKey,
+  sandboxKeysPerHour,
+} from "../../src/auth/sandbox-keys";
+import { call, connect, json, mockApi } from "../helpers/worker";
 
 const LIVE = `mfy_live_${"L".repeat(43)}`;
 const OAUTH = `mfy_oauth_${"O".repeat(43)}`;
@@ -256,5 +262,109 @@ describe("device login (RFC 8628)", () => {
 
     expect(token.headers.get("Cache-Control")).toBe("no-store");
     expect(sandbox.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
+describe("sandbox key options", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function create(body: unknown, ip: string): Promise<Response> {
+    return call("/sandbox/keys", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": ip, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function account(key: string): Promise<unknown> {
+    const client = await connect(key);
+    return (await client.callTool({ name: "get_account", arguments: {} }))
+      .structuredContent;
+  }
+
+  it("a key created with no body is a plain anonymous sandbox key", async () => {
+    mockApi(() => json(500, {}));
+    const created = SandboxKey.parse(
+      await (await sandboxKey("203.0.113.20")).json(),
+    );
+
+    expect(await account(created.api_key)).toMatchObject({
+      keyKind: "anonymous",
+      sandbox: true,
+      budget: null,
+    });
+  });
+
+  it("person and bot keys are created and accepted on /mcp", async () => {
+    mockApi(() => json(500, {}));
+    for (const actsAs of ["person", "bot"]) {
+      const response = await create({ acts_as: actsAs }, "203.0.113.21");
+      const created = SandboxKey.parse(await response.json());
+
+      expect(response.status).toBe(200);
+      expect((await mcp(created.api_key)).status).not.toBe(401);
+    }
+  });
+
+  it("an unknown acts_as is 400 and names the allowed values", async () => {
+    const response = await create({ acts_as: "robot" }, "203.0.113.22");
+    const body = z
+      .object({ error: z.string(), error_description: z.string() })
+      .parse(await response.json());
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("invalid_request");
+    expect(body.error_description).toContain("person");
+    expect(body.error_description).toContain("bot");
+  });
+
+  it("agent_layer bare is accepted where the Worker allows it", async () => {
+    const response = await create({ agent_layer: "bare" }, "203.0.113.23");
+
+    expect(response.status).toBe(200);
+  });
+
+  it("agent_layer bare is 400 where the Worker does not allow it", async () => {
+    const response = await createSandboxKey(
+      new Request("https://mcp.test/sandbox/keys", {
+        method: "POST",
+        headers: {
+          "CF-Connecting-IP": "203.0.113.24",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ agent_layer: "bare" }),
+      }),
+      { ...env, ALLOW_BARE_AGENT_LAYER: "false" },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "invalid_request" });
+  });
+
+  it.each(["x=1", "null", "[]", "not json"])(
+    "a body that is not a JSON object (%s) is ignored, as before",
+    async (body) => {
+      const response = await call("/sandbox/keys", {
+        method: "POST",
+        headers: { "CF-Connecting-IP": "203.0.113.25" },
+        body,
+      });
+
+      expect(response.status).toBe(200);
+    },
+  );
+
+  it("bare is allowed only when ALLOW_BARE_AGENT_LAYER is true", () => {
+    expect(bareLayerAllowed("true")).toBe(true);
+    expect(bareLayerAllowed(undefined)).toBe(false);
+    expect(bareLayerAllowed("false")).toBe(false);
+  });
+
+  it("the keys per hour come from SANDBOX_KEYS_PER_HOUR, 5 by default", () => {
+    expect(sandboxKeysPerHour("200")).toBe(200);
+    expect(sandboxKeysPerHour(undefined)).toBe(5);
+    expect(sandboxKeysPerHour("not a number")).toBe(5);
   });
 });

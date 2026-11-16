@@ -14,6 +14,7 @@ export default defineConfig({
           PUBLIC_URL: "https://mcp.test",
           MCP_SERVER_SECRET: "test-secret",
           SANDBOX_ACCOUNT_KEY: `mfy_test_${"S".repeat(43)}`,
+          ALLOW_BARE_AGENT_LAYER: "true",
         },
       },
     }),

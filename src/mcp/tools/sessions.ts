@@ -3,7 +3,9 @@ import { z } from "zod";
 import { SHOT_TYPES, type SessionStatus } from "../../backend/types";
 import { AgentError } from "../errors";
 import { markLaunched, readQuote, saveQuote } from "../quotes";
+import type { Describe, LayerText } from "../layer";
 import { guarded, respond, type Session } from "../session";
+import { spendingRule } from "../spending";
 
 const MAX_WAIT_SECONDS = 45;
 const POLL_MS = 2000;
@@ -17,90 +19,88 @@ const RASTER_TYPES = new Set([
   "image/webp",
 ]);
 
-const PlanInputSchema = z.object({
-  products: z
-    .array(
-      z.object({
-        upload_ids: z
-          .array(z.string())
-          .min(1)
-          .max(2)
-          .describe(
+// Schema builders take the layer's describe and return the exact zod type,
+// which only inference can spell (module-private)
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- see above
+function planInput(d: Describe) {
+  return z.object({
+    products: z
+      .array(
+        z.object({
+          upload_ids: d(
+            z.array(z.string()).min(1).max(2),
             "From add_product_photos or get_uploaded_photos; the front first, then an optional detail",
           ),
-        name: z.string().max(80).optional(),
-        description: z.string().max(500).optional(),
-      }),
-    )
-    .min(1),
-  mode: z
-    .enum(["place", "studio"])
-    .default("place")
-    .describe(
+          name: z.string().max(80).optional(),
+          description: z.string().max(500).optional(),
+        }),
+      )
+      .min(1),
+    mode: d(
+      z.enum(["place", "studio"]).default("place"),
       "place: a real place (needs background_id or place_description); studio: a plain color background",
     ),
-  background_color: z
-    .string()
-    .max(30)
-    .optional()
-    .describe("Studio only, in words: white, light grey…"),
-  model_ids: z
-    .array(z.string())
-    .max(3)
-    .optional()
-    .describe("From list_models; empty for product-only photos"),
-  background_id: z.string().optional().describe("From list_backgrounds"),
-  place_description: z
-    .string()
-    .max(300)
-    .optional()
-    .describe("Or describe a real place in words"),
-  aspect_ratio: z
-    .string()
-    .describe(
+    background_color: d(
+      z.string().max(30).optional(),
+      "Studio only, in words: white, light grey…",
+    ),
+    model_ids: d(
+      z.array(z.string()).max(3).optional(),
+      "From list_models; empty for product-only photos",
+    ),
+    background_id: d(z.string().optional(), "From list_backgrounds"),
+    place_description: d(
+      z.string().max(300).optional(),
+      "Or describe a real place in words",
+    ),
+    aspect_ratio: d(
+      z.string(),
       "One of get_photo_options aspectRatios, e.g. 4:5. Ask the person if they did not say",
     ),
-  photos_per_product: z
-    .number()
-    .int()
-    .min(1)
-    .describe("Ask the person if they did not say"),
-  shot_types: z.array(z.enum(SHOT_TYPES)).optional(),
-  outfit: z
-    .object({
-      style: z.string().optional(),
-      note: z.string().max(200).optional(),
-    })
-    .optional()
-    .describe("What the model wears"),
-  direction: z
-    .string()
-    .max(500)
-    .optional()
-    .describe("Creative direction in the person's words"),
-  resolution: z.string().optional(),
-  quality: z.string().optional(),
-  locale: z
-    .string()
-    .default("en")
-    .describe("The person's language, e.g. en, es"),
-});
+    photos_per_product: d(
+      z.number().int().min(1),
+      "Ask the person if they did not say",
+    ),
+    shot_types: z.array(z.enum(SHOT_TYPES)).optional(),
+    outfit: d(
+      z
+        .object({
+          style: z.string().optional(),
+          note: z.string().max(200).optional(),
+        })
+        .optional(),
+      "What the model wears",
+    ),
+    direction: d(
+      z.string().max(500).optional(),
+      "Creative direction in the person's words",
+    ),
+    resolution: z.string().optional(),
+    quality: z.string().optional(),
+    locale: d(z.string().default("en"), "The person's language, e.g. en, es"),
+  });
+}
 
-const PlanOutput = z.object({
-  quote_id: z.string(),
-  expires_at: z.string(),
-  credits: z.number(),
-  photos: z.number(),
-  with_model: z.number(),
-  without_model: z.number(),
-  enough_credits: z.boolean(),
-  balance: z.number(),
-  budget: z
-    .object({ session_limit: z.number(), left_today: z.number() })
-    .nullable()
-    .describe("Live keys only"),
-  mood: z.string().nullable(),
-});
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- schema builder
+function planOutput(d: Describe) {
+  return z.object({
+    quote_id: z.string(),
+    expires_at: z.string(),
+    credits: z.number(),
+    photos: z.number(),
+    with_model: z.number(),
+    without_model: z.number(),
+    enough_credits: z.boolean(),
+    balance: z.number(),
+    budget: d(
+      z
+        .object({ session_limit: z.number(), left_today: z.number() })
+        .nullable(),
+      "Live keys only",
+    ),
+    mood: z.string().nullable(),
+  });
+}
 
 const SessionOutput = z.object({
   session_id: z.string(),
@@ -168,9 +168,9 @@ async function imageContent(
   return images;
 }
 
-function statusSentence(status: SessionStatus): string {
+function statusSentence(status: SessionStatus, layer: LayerText): string {
   return status.status === "running"
-    ? `Session ${status.session_id}: ${status.done} of ${status.total} photos ready. Call get_photo_session again with wait_seconds.`
+    ? `Session ${status.session_id}: ${status.done} of ${status.total} photos ready.${layer.guidance(" Call get_photo_session again with wait_seconds.")}`
     : `Session ${status.session_id} is ${status.status}: ${status.done} of ${status.total} photos. See them at ${status.web_url}`;
 }
 
@@ -178,14 +178,17 @@ export function registerSessionTools(
   server: McpServer,
   session: Session,
 ): void {
+  const { layer } = session;
   server.registerTool(
     "plan_photos",
     {
       title: "Plan a photo session",
-      description:
+      description: layer.tool(
+        "plan_photos",
         "Plans a photo session and returns its exact price in credits and a quote_id for generate_photos. Nothing is spent. aspect_ratio and photos_per_product are required: ask the person if they did not say.",
-      inputSchema: PlanInputSchema,
-      outputSchema: PlanOutput,
+      ),
+      inputSchema: planInput(layer.describe),
+      outputSchema: planOutput(layer.describe),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (input) =>
@@ -210,8 +213,10 @@ export function registerSessionTools(
                 ),
               };
         const ask =
-          session.props.kind === "oauth"
-            ? " Ask the person before calling generate_photos with user_confirmed: true."
+          spendingRule(session.props) === "person"
+            ? layer.guidance(
+                " Ask the person before calling generate_photos with user_confirmed: true.",
+              )
             : "";
         return respond(
           `${plan.stored.photos} photos for ${plan.stored.credits} credits (balance ${account.credits}).${ask}`,
@@ -235,14 +240,16 @@ export function registerSessionTools(
     "generate_photos",
     {
       title: "Generate the planned photos",
-      description:
+      description: layer.tool(
+        "generate_photos",
         "Launches the session planned by plan_photos (spends its credits; failed photos are refunded). Needs the quote_id. When a person is in the conversation, show them the price and set user_confirmed: true only after they agree. Then follow it with get_photo_session.",
+      ),
       inputSchema: z.object({
         quote_id: z.string(),
-        user_confirmed: z
-          .boolean()
-          .optional()
-          .describe("True only after the person said yes to this exact price"),
+        user_confirmed: layer.describe(
+          z.boolean().optional(),
+          "True only after the person said yes to this exact price",
+        ),
       }),
       outputSchema: SessionOutput,
       annotations: {
@@ -272,9 +279,12 @@ export function registerSessionTools(
         }
         if (quote.sessionId !== null) {
           const existing = await session.backend.session(quote.sessionId);
-          return respond(statusSentence(existing), { ...existing });
+          return respond(statusSentence(existing, layer), { ...existing });
         }
-        if (session.props.kind === "oauth" && user_confirmed !== true) {
+        if (
+          spendingRule(session.props) === "person" &&
+          user_confirmed !== true
+        ) {
           throw new AgentError(
             "CONFIRMATION_REQUIRED",
             `This launch spends ${quote.plan.credits} credits for ${quote.plan.photos} photos and needs the person's yes.`,
@@ -283,7 +293,7 @@ export function registerSessionTools(
         }
         const status = await session.backend.launch(quote.plan, quote_id);
         await markLaunched(kv, quote_id, quote, status.session_id);
-        return respond(statusSentence(status), { ...status });
+        return respond(statusSentence(status, layer), { ...status });
       }),
   );
 
@@ -291,8 +301,10 @@ export function registerSessionTools(
     "get_photo_session",
     {
       title: "Photo session status",
-      description:
+      description: layer.tool(
+        "get_photo_session",
         "A session's progress and its finished photos (shown as images when small enough, always with links). wait_seconds (up to 45) waits until it finishes. Free.",
+      ),
       inputSchema: z.object({
         session_id: z.string(),
         wait_seconds: z.number().int().min(0).max(MAX_WAIT_SECONDS).default(0),
@@ -311,7 +323,7 @@ export function registerSessionTools(
           await wait(POLL_MS);
           status = await session.backend.session(session_id);
         }
-        const result = respond(statusSentence(status), { ...status });
+        const result = respond(statusSentence(status, layer), { ...status });
         result.content.push(...(await imageContent(status)));
         return result;
       }),
@@ -321,8 +333,10 @@ export function registerSessionTools(
     "list_recent_photos",
     {
       title: "Recent photos",
-      description:
+      description: layer.tool(
+        "list_recent_photos",
         "The latest photos of the account, newest first, optionally of one session. Free.",
+      ),
       inputSchema: z.object({
         limit: z.number().int().min(1).max(30).default(10),
         session_id: z.string().optional(),
@@ -341,8 +355,10 @@ export function registerSessionTools(
     "cancel_photo_session",
     {
       title: "Cancel a photo session",
-      description:
+      description: layer.tool(
+        "cancel_photo_session",
         "Stops a running session. Photos not started yet are cancelled and their credits refunded; finished photos stay.",
+      ),
       inputSchema: z.object({ session_id: z.string() }),
       outputSchema: SessionOutput,
       annotations: {
@@ -354,7 +370,7 @@ export function registerSessionTools(
     ({ session_id }) =>
       guarded(session, async () => {
         const status = await session.backend.cancel(session_id);
-        return respond(statusSentence(status), { ...status });
+        return respond(statusSentence(status, layer), { ...status });
       }),
   );
 }

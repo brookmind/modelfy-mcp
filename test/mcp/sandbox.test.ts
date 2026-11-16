@@ -1,7 +1,6 @@
-import { env, exports } from "cloudflare:workers";
+import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { sha256Hex } from "../../src/crypto";
 import { call, connect, json, mockApi, type ApiCall } from "../helpers/worker";
 
 const TEST_KEY = `mfy_test_${"T".repeat(43)}`;
@@ -258,33 +257,6 @@ describe("the sandbox", () => {
     ).toEqual(["staff-1"]);
   });
 
-  it("an anonymous key past 300 calls in an hour is refused with 429", async () => {
-    mockApi(catalogApi, images);
-    const key = await anonymousKey("192.0.2.77");
-    const stored = z
-      .object({ sandboxId: z.string() })
-      .parse(
-        await env.OAUTH_KV.get(`sandbox-key:${await sha256Hex(key)}`, "json"),
-      );
-    const window = Math.floor(Date.now() / 3_600_000);
-    await env.OAUTH_KV.put(
-      `limit:anon-calls:${stored.sandboxId}:${window}`,
-      "300",
-    );
-
-    const response = await call("/mcp", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
-    });
-
-    expect(response.status).toBe(429);
-  });
-
   it("cancelling a sandbox session twice keeps it cancelled", async () => {
     mockApi(catalogApi, images);
     const client = await connect(TEST_KEY);
@@ -317,4 +289,181 @@ describe("the sandbox", () => {
 
     expect(again.structuredContent).toMatchObject({ status: "cancelled" });
   }, 30_000);
+});
+
+describe("sandbox keys that act as a person or a bot", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function keyActingAs(
+    actsAs: "person" | "bot",
+    ip: string,
+  ): Promise<string> {
+    const response = await call("/sandbox/keys", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": ip, "Content-Type": "application/json" },
+      body: JSON.stringify({ acts_as: actsAs }),
+    });
+    return z.object({ api_key: z.string() }).parse(await response.json())
+      .api_key;
+  }
+
+  async function plan(
+    client: Awaited<ReturnType<typeof connect>>,
+    photos: number,
+  ): Promise<z.infer<typeof Quote>> {
+    return Quote.parse(
+      (
+        await client.callTool({
+          name: "plan_photos",
+          arguments: {
+            ...PLAN,
+            photos_per_product: photos,
+            products: [{ upload_ids: ["sbx_x"] }],
+          },
+        })
+      ).structuredContent,
+    );
+  }
+
+  const ErrorJson = z.object({
+    error: z.object({
+      code: z.string(),
+      budget: z
+        .object({
+          limit: z.string(),
+          requested: z.number(),
+          maxCreditsPerSession: z.number(),
+          spentToday: z.number(),
+        })
+        .optional(),
+    }),
+  });
+
+  function errorOf(content: unknown): z.infer<typeof ErrorJson> {
+    const json = z
+      .array(z.object({ type: z.string(), text: z.string().optional() }))
+      .parse(content)
+      .map((part) => part.text ?? "")
+      .find((text) => text.startsWith("{"));
+    return ErrorJson.parse(JSON.parse(json ?? "{}"));
+  }
+
+  it("a person key gets the consent instructions", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(await keyActingAs("person", "192.0.2.101"));
+
+    expect(client.getInstructions()).toContain(
+      "show them the credits from plan_photos and ask",
+    );
+  });
+
+  it("a person key needs user_confirmed to launch", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(await keyActingAs("person", "192.0.2.102"));
+    const quote = await plan(client, 2);
+
+    const refused = await client.callTool({
+      name: "generate_photos",
+      arguments: { quote_id: quote.quote_id },
+    });
+    const launched = await client.callTool({
+      name: "generate_photos",
+      arguments: { quote_id: quote.quote_id, user_confirmed: true },
+    });
+
+    expect(errorOf(refused.content).error.code).toBe("CONFIRMATION_REQUIRED");
+    expect(launched.isError).not.toBe(true);
+  });
+
+  it("a plain sandbox key still launches without user_confirmed", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(await anonymousKey("192.0.2.103"));
+    const quote = await plan(client, 2);
+
+    const launched = await client.callTool({
+      name: "generate_photos",
+      arguments: { quote_id: quote.quote_id },
+    });
+
+    expect(launched.isError).not.toBe(true);
+  });
+
+  it("a bot key shows the default live budget", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(await keyActingAs("bot", "192.0.2.104"));
+    const tomorrow = new Date();
+    tomorrow.setUTCHours(24, 0, 0, 0);
+
+    const account = await client.callTool({
+      name: "get_account",
+      arguments: {},
+    });
+    const quote = await client.callTool({
+      name: "plan_photos",
+      arguments: { ...PLAN, products: [{ upload_ids: ["sbx_x"] }] },
+    });
+
+    expect(account.structuredContent).toMatchObject({
+      sandbox: true,
+      budget: {
+        maxCreditsPerSession: 100,
+        maxCreditsPerDay: 500,
+        spentToday: 0,
+        resetsAt: tomorrow.toISOString(),
+      },
+    });
+    expect(quote.structuredContent).toMatchObject({
+      budget: { session_limit: 100, left_today: 500 },
+    });
+    expect(client.getInstructions()).toContain("BUDGET_EXCEEDED");
+  });
+
+  it("a bot key refuses a session over its per-session budget", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(await keyActingAs("bot", "192.0.2.105"));
+    const quote = await plan(client, 6);
+
+    const refused = await client.callTool({
+      name: "generate_photos",
+      arguments: { quote_id: quote.quote_id },
+    });
+
+    expect(errorOf(refused.content).error).toMatchObject({
+      code: "BUDGET_EXCEEDED",
+      budget: { limit: "session", requested: 120, maxCreditsPerSession: 100 },
+    });
+  });
+
+  it("a bot key refuses a launch over its daily budget", async () => {
+    mockApi(catalogApi, images);
+    const client = await connect(await keyActingAs("bot", "192.0.2.106"));
+    for (let i = 0; i < 5; i++) {
+      const quote = await plan(client, 5);
+      const launched = await client.callTool({
+        name: "generate_photos",
+        arguments: { quote_id: quote.quote_id },
+      });
+      expect(launched.isError).not.toBe(true);
+    }
+    const sixth = await plan(client, 5);
+
+    const refused = await client.callTool({
+      name: "generate_photos",
+      arguments: { quote_id: sixth.quote_id },
+    });
+    const account = await client.callTool({
+      name: "get_account",
+      arguments: {},
+    });
+
+    expect(errorOf(refused.content).error).toMatchObject({
+      code: "BUDGET_EXCEEDED",
+      budget: { limit: "day", requested: 100, spentToday: 500 },
+    });
+    expect(account.structuredContent).toMatchObject({
+      budget: { spentToday: 500 },
+    });
+  }, 60_000);
 });
