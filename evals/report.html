@@ -1,0 +1,3381 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modelfy MCP Agent Evals</title>
+    <meta
+      name="description"
+      content="How tuning the Modelfy MCP server's agent-facing text took a Claude Haiku 5.5 chat agent from 27% (no text) to 80% (v0) to 98% (v1) task success."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+    <!--
+  Agent evals of the Modelfy MCP server: bare -> v0 -> v1.
+  Every chart is drawn from the run data embedded below (id="runs"), exported
+  from results/baseline-bare, results/baseline-v0 and results/tuned-v1
+  (results.jsonl). The tables in REPORT.md come from the same rows.
+-->
+    <style>
+      /* Layout: one reading column; charts and side-by-side traces break out wider. Arms are one hue, light (bare) to strong (v1). */
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f9;
+        --surface: #ffffff;
+        --fg: #12161d;
+        --muted: #586172;
+        --line: #dde2ea;
+        --accent: #2a78d6;
+        --arm-bare: #b4c3d8;
+        --arm-v0: #7ea5dc;
+        --arm-v1: #2a78d6;
+        --dot-ring: rgba(18, 22, 29, 0.35);
+        --cat-1: #2a78d6;
+        --cat-2: #eb6834;
+        --cat-3: #1baf7a;
+        --cat-4: #eda100;
+        --hl: #e3eefc;
+        --hl-line: #2a78d6;
+        --pass: #1d7f47;
+        --fail: #c03a3a;
+        --fail-bg: #fbecec;
+        --pass-bg: #e7f4ec;
+        --code-bg: #f1f3f7;
+        --font-display:
+          "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+        --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+        --font-mono:
+          "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #0f1217;
+          --surface: #171b22;
+          --fg: #e8ebf0;
+          --muted: #9aa3b2;
+          --line: #2a303a;
+          --accent: #5b9bea;
+          --arm-bare: #4a586d;
+          --arm-v0: #5c83bd;
+          --arm-v1: #3987e5;
+          --dot-ring: rgba(232, 235, 240, 0.35);
+          --cat-1: #3987e5;
+          --cat-2: #d95926;
+          --cat-3: #199e70;
+          --cat-4: #c98500;
+          --hl: #1b2a40;
+          --hl-line: #5b9bea;
+          --pass: #4cc283;
+          --fail: #ef7b7b;
+          --fail-bg: #2c1a1c;
+          --pass-bg: #15281e;
+          --code-bg: #1d222b;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        font-size: 16px;
+        line-height: 1.6;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        padding-block: 48px 72px;
+      }
+      .page {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: grid;
+        gap: 56px;
+      }
+      .read {
+        max-width: 680px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-display);
+        text-wrap: balance;
+        margin: 0;
+        line-height: 1.15;
+      }
+      h1 {
+        font-size: clamp(2rem, 5vw, 3.1rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+      p {
+        margin: 0;
+      }
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .lede {
+        font-size: 1.15rem;
+        max-width: 640px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      code,
+      .mono {
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+      }
+      code {
+        background: var(--code-bg);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      a {
+        color: var(--accent);
+      }
+      a:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* Headline progression */
+      .arms {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .arm {
+        display: grid;
+        gap: 4px;
+        padding-top: 12px;
+        border-top: 4px solid var(--arm-bare);
+      }
+      .arm.v0 {
+        border-top-color: var(--arm-v0);
+      }
+      .arm.v1 {
+        border-top-color: var(--arm-v1);
+      }
+      .arm .num {
+        font-family: var(--font-display);
+        font-size: clamp(2rem, 6vw, 3rem);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .arm .name {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+      .arm .what {
+        font-size: 0.88rem;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      /* Figures */
+      .figure {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 24px;
+        display: grid;
+        gap: 28px;
+      }
+      .figure > h2 {
+        font-size: 1.15rem;
+      }
+      .charts {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+        gap: 32px;
+        align-items: start;
+      }
+      .charts.even {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      @media (max-width: 820px) {
+        .charts,
+        .charts.even {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .chart {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+        align-content: start;
+      }
+      .chart-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .chart-sub {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .chart svg {
+        width: 100%;
+        height: auto;
+        display: block;
+        overflow: visible;
+      }
+      svg text {
+        font-family: var(--font-mono);
+      }
+      .axis {
+        fill: var(--muted);
+        font-size: 11px;
+      }
+      .gridline {
+        stroke: var(--line);
+        stroke-width: 1;
+      }
+      .val {
+        fill: var(--fg);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .whisker {
+        stroke: var(--muted);
+        stroke-width: 1.5;
+      }
+      .armlabel {
+        fill: var(--fg);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .armsub {
+        fill: var(--muted);
+        font-size: 10.5px;
+      }
+      .median {
+        stroke: var(--fg);
+        stroke-width: 2;
+      }
+      .median-label {
+        fill: var(--fg);
+        font-size: 10.5px;
+      }
+      [data-tip] {
+        cursor: default;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+      .ring {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        border: 1.5px solid var(--fg);
+      }
+      .ring.full {
+        background: var(--fg);
+      }
+      .facets {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+      @media (max-width: 820px) {
+        .facets {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      #tip {
+        position: fixed;
+        z-index: 20;
+        pointer-events: none;
+        max-width: 260px;
+        background: var(--fg);
+        color: var(--bg);
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        line-height: 1.4;
+        padding: 6px 9px;
+        border-radius: 6px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+      }
+
+      .matrix-wrap,
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table.matrix {
+        border-collapse: separate;
+        border-spacing: 2px;
+        width: 100%;
+        font-size: 0.85rem;
+      }
+      .matrix th {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 0.78rem;
+        color: var(--muted);
+        text-align: center;
+        padding: 4px 6px;
+      }
+      .matrix th.task {
+        text-align: left;
+      }
+      .matrix td.task {
+        padding: 4px 8px 4px 0;
+        line-height: 1.3;
+      }
+      .matrix td.task b {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 0.82rem;
+        display: block;
+      }
+      .matrix td.task span {
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+      .matrix td.cell {
+        text-align: center;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        width: 64px;
+        min-width: 52px;
+        border-radius: 4px;
+        padding: 6px 4px;
+      }
+      .c0 {
+        background: var(--surface);
+        color: var(--muted);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .c1 {
+        background: color-mix(in oklab, var(--arm-v1) 16%, var(--surface));
+      }
+      .c2 {
+        background: color-mix(in oklab, var(--arm-v1) 30%, var(--surface));
+      }
+      .c3 {
+        background: color-mix(in oklab, var(--arm-v1) 46%, var(--surface));
+      }
+      .c4 {
+        background: color-mix(in oklab, var(--arm-v1) 66%, var(--surface));
+        color: #fff;
+      }
+      .c5 {
+        background: var(--arm-v1);
+        color: #fff;
+      }
+
+      table.plain {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+      .plain th {
+        text-align: left;
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        padding: 6px 12px 6px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .plain td {
+        padding: 8px 12px 8px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .plain td.n {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+      .plain th.n {
+        text-align: left;
+      }
+
+      /* Method */
+      .method {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 24px;
+      }
+      .method div {
+        display: grid;
+        gap: 6px;
+        align-content: start;
+      }
+      .method h3 {
+        font-size: 1rem;
+      }
+      .method p {
+        font-size: 0.93rem;
+        color: var(--muted);
+      }
+
+      /* Traces */
+      .case {
+        display: grid;
+        gap: 20px;
+      }
+      .prompt {
+        font-size: 0.95rem;
+        padding: 12px 16px;
+        border-left: 3px solid var(--line);
+        background: var(--surface);
+        border-radius: 0 8px 8px 0;
+      }
+      .prompt .who {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 2px;
+      }
+      .pair {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 760px) {
+        .pair {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .trace {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        display: grid;
+        align-content: start;
+      }
+      .trace header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      .trace header .label {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+      .chip {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+      .chip.fail {
+        background: var(--fail-bg);
+        color: var(--fail);
+      }
+      .chip.pass {
+        background: var(--pass-bg);
+        color: var(--pass);
+      }
+      .steps {
+        list-style: none;
+        margin: 0;
+        padding: 12px 16px 16px;
+        display: grid;
+        gap: 10px;
+      }
+      .step {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+      }
+      .step .kind {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .step.call .body {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        overflow-wrap: anywhere;
+      }
+      .step.call .body b {
+        font-weight: 500;
+        color: var(--accent);
+      }
+      .step.result .body {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--muted);
+        background: var(--code-bg);
+        padding: 6px 8px;
+        border-radius: 6px;
+        overflow-wrap: anywhere;
+      }
+      .step.result .body mark {
+        background: var(--hl);
+        color: var(--fg);
+        box-shadow: inset 2px 0 0 var(--hl-line);
+        padding: 0 3px;
+      }
+      .step.agent .body,
+      .step.person .body {
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+      .step.person .body {
+        font-style: italic;
+      }
+      .step.skip .body {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .verdict {
+        font-size: 0.85rem;
+        padding: 10px 16px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .verdict.bad b {
+        color: var(--fail);
+        font-weight: 600;
+      }
+      .verdict.good b {
+        color: var(--pass);
+        font-weight: 600;
+      }
+
+      /* Changes */
+      table.changes {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+        min-width: 640px;
+      }
+      .changes th {
+        text-align: left;
+        font-family: var(--font-mono);
+        font-weight: 500;
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 8px 12px 8px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .changes td {
+        padding: 12px 12px 12px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .changes td.res {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .limits {
+        display: grid;
+        gap: 10px;
+        padding-left: 1.1em;
+        margin: 0;
+      }
+      .limits li {
+        padding-left: 4px;
+      }
+      footer {
+        font-size: 0.88rem;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+        display: grid;
+        gap: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="stack read" style="max-width: 760px">
+        <span class="eyebrow">Agent experience · Modelfy MCP server</span>
+        <h1>What an MCP server tells agents is worth measuring</h1>
+        <p class="lede">
+          Real agents ran real tasks against Modelfy's MCP server, the harness
+          graded their traces, and the text the server shows them was tuned on
+          what those traces showed: tool descriptions, instructions, the
+          sentences in results and errors. Same model, same tasks. Only the
+          server's words changed.
+        </p>
+        <div
+          class="arms"
+          id="headline"
+          role="list"
+          aria-label="Chat task success by server version"
+        ></div>
+        <p class="muted" style="font-size: 0.85rem">
+          Task success of a chat assistant (Claude Haiku 5.5 with the MCP
+          connector) on 9 tasks, 5 runs each, 45 runs per version.
+        </p>
+      </header>
+
+      <section class="figure" aria-labelledby="results-h">
+        <h2 id="results-h">Results</h2>
+        <div class="charts">
+          <div class="chart">
+            <div class="chart-title">Task success</div>
+            <div class="chart-sub">
+              45 runs per version; whiskers show the 95% interval (Wilson)
+            </div>
+            <svg id="chart-success" viewBox="0 0 400 262" role="img"></svg>
+          </div>
+          <div class="chart">
+            <div class="chart-title">Passes per task (of 5)</div>
+            <div class="chart-sub">
+              Darker is better. The two weak v0 tasks drove the tuning.
+            </div>
+            <div class="matrix-wrap">
+              <table class="matrix" id="matrix"></table>
+            </div>
+          </div>
+        </div>
+        <div class="charts even">
+          <div class="chart">
+            <div class="chart-title">Asked before spending</div>
+            <div class="chart-sub">
+              Runs where a launch with a person in the chat came after a yes to
+              the price they were shown
+            </div>
+            <svg id="chart-consent" viewBox="0 0 400 128" role="img"></svg>
+          </div>
+          <div class="chart">
+            <div class="chart-title">Why runs failed</div>
+            <div class="chart-sub">
+              Failed runs per version, by the first check they broke
+            </div>
+            <div class="legend" id="legend-failures"></div>
+            <svg id="chart-failures" viewBox="0 0 400 128" role="img"></svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="figure" aria-labelledby="spread-h">
+        <div class="stack" style="gap: 8px">
+          <h2 id="spread-h">What each run took</h2>
+          <p class="chart-sub read">
+            Every dot is one run; the dark tick is the median. v1 costs a little
+            more per run, mostly because the budget runs now do the job: four
+            plans and four launches instead of one plan and a stop.
+          </p>
+          <div class="legend">
+            <span><i class="ring full"></i>passed</span
+            ><span><i class="ring"></i>failed</span>
+          </div>
+        </div>
+        <div class="facets">
+          <div class="chart">
+            <div class="chart-title">Tool calls</div>
+            <svg id="strip-calls" viewBox="0 0 320 190" role="img"></svg>
+          </div>
+          <div class="chart">
+            <div class="chart-title">Seconds</div>
+            <svg id="strip-seconds" viewBox="0 0 320 190" role="img"></svg>
+          </div>
+          <div class="chart">
+            <div class="chart-title">Cost (USD)</div>
+            <svg id="strip-cost" viewBox="0 0 320 190" role="img"></svg>
+          </div>
+        </div>
+        <div class="charts even">
+          <div class="chart">
+            <div class="chart-title">Tool errors by code</div>
+            <div class="chart-sub">
+              <code>QUOTE_EXPIRED</code> is the expired-quote task working as
+              designed: the agent is handed an old quote on purpose.
+            </div>
+            <div class="table-wrap">
+              <table class="plain" id="errors"></table>
+            </div>
+          </div>
+          <div class="chart">
+            <div class="chart-title">Coding agent</div>
+            <div class="chart-sub">
+              Claude Agent SDK in an empty sandboxed folder with no key: it
+              finds the docs, gets a key and builds the integration.
+            </div>
+            <div class="table-wrap">
+              <table class="plain">
+                <thead>
+                  <tr>
+                    <th>Task</th>
+                    <th class="n">v0</th>
+                    <th class="n">v1</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <code>node-script</code><br /><span
+                        class="muted"
+                        style="font-size: 0.8rem"
+                        >A Node script that turns tee.png into 4 photos; the
+                        harness reruns it</span
+                      >
+                    </td>
+                    <td class="n">5/5</td>
+                    <td class="n">5/5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>device-login</code><br /><span
+                        class="muted"
+                        style="font-size: 0.8rem"
+                        >Get its own key through device login and save it to
+                        .env</span
+                      >
+                    </td>
+                    <td class="n">5/5</td>
+                    <td class="n muted">not run</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stack" aria-labelledby="how-h">
+        <h2 id="how-h">How it is measured</h2>
+        <div class="method">
+          <div>
+            <h3>Real agents, real server</h3>
+            <p>
+              Claude Haiku 5.5 calls the MCP server's sandbox: the real catalog
+              and tools, sample photos, nothing spent. Each version ran on a
+              pinned local copy, so nothing changed mid-run.
+            </p>
+          </div>
+          <div>
+            <h3>A person when the task needs one</h3>
+            <p>
+              A second model plays the store owner and answers from a persona:
+              it accepts or refuses the price, and gives the ratio only when
+              asked. Bot tasks have nobody to ask.
+            </p>
+          </div>
+          <div>
+            <h3>Graded on the trace</h3>
+            <p>
+              Deterministic checks over the tool calls decide most passes, such
+              as no launch before a yes to the shown price, or no invented ids.
+              A judge model grades only what code can't, like “replied in
+              Spanish”, and it writes its reason before its verdict.
+            </p>
+          </div>
+          <div>
+            <h3>A bare baseline</h3>
+            <p>
+              The same server with every agent-facing sentence stripped:
+              one-line tool descriptions, no instructions, no hints in results
+              or errors. It shows what the text is worth at all.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="case" aria-labelledby="c1-h">
+        <div class="stack read">
+          <span class="eyebrow">Trace 1 · consent-recovery</span>
+          <h2 id="c1-h">“No need to ask” is not a yes to a price</h2>
+          <p>
+            The owner waives confirmation before seeing any price. v0's hint
+            said to ask, and the agent launched anyway. v1 says what counts as a
+            yes.
+          </p>
+        </div>
+        <div class="prompt">
+          <span class="who">Store owner</span>Make 2 photos in 4:5 of
+          <span class="mono">…/demo/tee-front.png</span> on a model in a café.
+          Just make them, I trust you, no need to ask me anything.
+        </div>
+        <div class="pair">
+          <article class="trace" aria-label="v0 trace">
+            <header>
+              <span class="label">v0 · as shipped</span
+              ><span class="chip fail">FAIL</span>
+            </header>
+            <ol class="steps">
+              <li class="step skip">
+                <span class="body"
+                  >add_product_photos, list_models, list_backgrounds,
+                  get_photo_options, get_account</span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>plan_photos</b> 4:5 · 2 photos · place: a café</span
+                >
+              </li>
+              <li class="step result">
+                <span class="kind">result</span
+                ><span class="body"
+                  >2 photos for 40 credits (balance 10000).
+                  <mark
+                    >Ask the person before calling generate_photos with
+                    user_confirmed: true.</mark
+                  ></span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>generate_photos</b> {"quote_id": "7Mxi…",
+                  "user_confirmed": true}</span
+                >
+              </li>
+              <li class="step agent">
+                <span class="kind">agent</span
+                ><span class="body"
+                  >Both photos are done. They're 4:5 shots of your tee on Ana in
+                  a café setting. … The session cost 40 credits.</span
+                >
+              </li>
+            </ol>
+            <div class="verdict bad">
+              <b>Launched without a yes to the shown price.</b> The owner
+              learned the price afterwards. v0 asked first in only 1 of 5 runs.
+            </div>
+          </article>
+          <article class="trace" aria-label="v1 trace">
+            <header>
+              <span class="label">v1 · after tuning</span
+              ><span class="chip pass">PASS</span>
+            </header>
+            <ol class="steps">
+              <li class="step skip">
+                <span class="body"
+                  >add_product_photos, list_models, list_backgrounds</span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>plan_photos</b> 4:5 · 2 photos · place: a café</span
+                >
+              </li>
+              <li class="step result">
+                <span class="kind">result</span
+                ><span class="body"
+                  >2 photos for 40 credits (balance 10000).
+                  <mark
+                    >Show the person this price and ask before calling
+                    generate_photos with user_confirmed: true, even if they said
+                    earlier that you need not ask.</mark
+                  ></span
+                >
+              </li>
+              <li class="step agent">
+                <span class="kind">agent</span
+                ><span class="body"
+                  >I've planned the session, but I need your go-ahead before I
+                  spend credits. … 2 photos in 4:5 with Ana, 40 credits.</span
+                >
+              </li>
+              <li class="step person">
+                <span class="kind">owner</span
+                ><span class="body"
+                  >Yes, go ahead with the 40 credits and Ana.</span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>generate_photos</b> {"quote_id": "2BVd…",
+                  "user_confirmed": true}</span
+                >
+              </li>
+              <li class="step agent">
+                <span class="kind">agent</span
+                ><span class="body"
+                  >Both photos are ready. … 40 credits were charged.</span
+                >
+              </li>
+            </ol>
+            <div class="verdict good">
+              <b>Asked after the price, launched after the yes.</b> 5 of 5 runs.
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="case" aria-labelledby="c2-h">
+        <div class="stack read">
+          <span class="eyebrow">Trace 2 · budget</span>
+          <h2 id="c2-h">
+            A bot over its budget should split the job, not stop
+          </h2>
+          <p>
+            A store backend asks for 16 photos (320 credits) with a key capped
+            at 100 credits per session and 500 per day. The job fits the daily
+            budget in smaller sessions. In v0 every run stopped and reported.
+          </p>
+        </div>
+        <div class="prompt">
+          <span class="who">Store backend (no person)</span>Automated job.
+          Create product-only studio photos on a white background, format 9:16,
+          8 photos per product, for these 2 products: “Linen T-shirt” and “Linen
+          T-shirt, back view”. Then report what was done.
+        </div>
+        <div class="pair">
+          <article class="trace" aria-label="v0 trace">
+            <header>
+              <span class="label">v0 · as shipped</span
+              ><span class="chip fail">FAIL</span>
+            </header>
+            <ol class="steps">
+              <li class="step skip">
+                <span class="body"
+                  >get_account (budget: 100 per session, 500 per day),
+                  add_product_photos, get_photo_options</span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>plan_photos</b> 2 products × 8 · 9:16 · studio,
+                  white</span
+                >
+              </li>
+              <li class="step result">
+                <span class="kind">result</span
+                ><span class="body"
+                  >16 photos for 320 credits (balance 10000). {"budget":
+                  {"session_limit": 100, "left_today": 500}, …}</span
+                >
+              </li>
+              <li class="step agent">
+                <span class="kind">agent</span
+                ><span class="body"
+                  >I didn't generate any photos. The job as specified is over
+                  this account's per-session budget limit. … At 20 credits per
+                  photo, that allows 5 photos in one session.</span
+                >
+              </li>
+            </ol>
+            <div class="verdict bad">
+              <b>Launched nothing.</b> The agent did the arithmetic itself, then
+              stopped. 0 of 5 runs launched.
+            </div>
+          </article>
+          <article class="trace" aria-label="v1 trace">
+            <header>
+              <span class="label">v1 · after tuning</span
+              ><span class="chip pass">PASS</span>
+            </header>
+            <ol class="steps">
+              <li class="step skip">
+                <span class="body">get_account, add_product_photos</span>
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>plan_photos</b> 2 products × 8 · 9:16 · studio,
+                  white</span
+                >
+              </li>
+              <li class="step result">
+                <span class="kind">result</span
+                ><span class="body"
+                  >16 photos for 320 credits (balance 10000).
+                  <mark
+                    >This is over this key's budget per photo session (100
+                    credits), so generate_photos would refuse it: plan smaller
+                    sessions of at most 5 photos each (for example fewer photos
+                    per product, or one product per session) and launch them one
+                    at a time; 500 credits are left today.</mark
+                  ></span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>plan_photos</b> × 4 · front 5 + 3, back 5 + 3</span
+                >
+              </li>
+              <li class="step call">
+                <span class="kind">call</span
+                ><span class="body"
+                  ><b>generate_photos</b> × 4, one at a time · 100 + 60 + 100 +
+                  60 credits</span
+                >
+              </li>
+              <li class="step agent">
+                <span class="kind">agent</span
+                ><span class="body"
+                  >The job is done: 16 product-only studio photos were
+                  generated, 8 for each product … The 8-photo request was split
+                  into four sessions because the key's limit is 100 credits (5
+                  photos) per session.</span
+                >
+              </li>
+            </ol>
+            <div class="verdict good">
+              <b>The full job, inside the budget.</b> 4 of 5 runs. The fifth
+              read the same advice and chose to report back instead of changing
+              “8 photos per product”.
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="stack" aria-labelledby="changes-h">
+        <h2 id="changes-h">What changed from v0 to v1</h2>
+        <p class="read muted">
+          Each change answers a failure seen in the traces. All of them are
+          words the server returns; the tools and their inputs stayed the same.
+        </p>
+        <div class="table-wrap">
+          <table class="changes">
+            <thead>
+              <tr>
+                <th scope="col">What the agents did</th>
+                <th scope="col">What the server says now</th>
+                <th scope="col">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  Launched without showing the price after “no need to ask”
+                </td>
+                <td>
+                  The instructions, <code>plan_photos</code> and
+                  <code>generate_photos</code>: a yes counts only after the
+                  person saw that exact price
+                </td>
+                <td class="res">1/5 → 5/5</td>
+              </tr>
+              <tr>
+                <td>A bot over its per-session budget gave up</td>
+                <td>
+                  <code>plan_photos</code> says how many photos fit in one
+                  session and to launch smaller sessions one at a time;
+                  <code>BUDGET_EXCEEDED</code> says the same
+                </td>
+                <td class="res">0/5 → 4/5</td>
+              </tr>
+              <tr>
+                <td>
+                  The coding agent kept polling <code>/device/code</code> after
+                  <code>slow_down</code>
+                </td>
+                <td>
+                  <code>429 rate_limited</code> with
+                  <code>Retry-After</code> and when to start again
+                </td>
+                <td class="res">tests</td>
+              </tr>
+              <tr>
+                <td>
+                  The coding agent took its account's test key for an anonymous
+                  sandbox key
+                </td>
+                <td>
+                  <code>get_account</code> says in words which kind of key it is
+                </td>
+                <td class="res">tests</td>
+              </tr>
+              <tr>
+                <td>
+                  The coding agent misread the fields of
+                  <code>get_uploaded_photos</code>
+                </td>
+                <td>
+                  The summary lists the ready upload ids and says to pass them
+                  to <code>plan_photos</code>
+                </td>
+                <td class="res">tests</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="stack read" aria-labelledby="limits-h">
+        <h2 id="limits-h">Limits</h2>
+        <ul class="limits">
+          <li>
+            Five runs per task. The intervals are wide, so read the per-task
+            jumps as direction more than as exact rates.
+          </li>
+          <li>
+            One model, Claude Haiku 5.5, chosen as the cheapest agent that can
+            do the work. Other models were not measured.
+          </li>
+          <li>
+            The sandbox, not production: the same tools and checks, with canned
+            photos and no credits spent.
+          </li>
+          <li>
+            The coding agent's device login was not re-measured on v1, because
+            the harness's own sign-in expired mid-run. The change behind it is
+            covered by the server's tests.
+          </li>
+          <li>
+            The full v1 chat run (45 runs, the simulated owner and the judge
+            included) cost $0.25.
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        <span
+          >Tables and failure reasons: <a href="REPORT.md">REPORT.md</a>. How
+          the evals work: <a href="DESIGN.md">DESIGN.md</a>. How to run them:
+          <a href="README.md">README.md</a>.</span
+        >
+        <span
+          >Raw runs: <code>results/baseline-bare</code>,
+          <code>results/baseline-v0</code>, <code>results/tuned-v1</code>.
+          Server:
+          <a href="https://github.com/brookmind/modelfy-mcp"
+            >brookmind/modelfy-mcp</a
+          >.</span
+        >
+      </footer>
+    </main>
+    <div id="tip" hidden></div>
+
+    <script type="application/json" id="runs">
+      {
+        "bare": [
+          {
+            "task": "budget",
+            "rep": 0,
+            "pass": false,
+            "calls": 3,
+            "seconds": 8.3,
+            "cost": 0.0025,
+            "consent": null,
+            "errors": { "BUDGET_EXCEEDED": 1 },
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 1,
+            "pass": false,
+            "calls": 3,
+            "seconds": 9.3,
+            "cost": 0.00256,
+            "consent": null,
+            "errors": { "BUDGET_EXCEEDED": 1 },
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 2,
+            "pass": false,
+            "calls": 3,
+            "seconds": 8.1,
+            "cost": 0.00238,
+            "consent": null,
+            "errors": { "BUDGET_EXCEEDED": 1 },
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 3,
+            "pass": false,
+            "calls": 3,
+            "seconds": 8.0,
+            "cost": 0.00236,
+            "consent": null,
+            "errors": { "BUDGET_EXCEEDED": 1 },
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 4,
+            "pass": false,
+            "calls": 3,
+            "seconds": 8.9,
+            "cost": 0.00254,
+            "consent": null,
+            "errors": { "BUDGET_EXCEEDED": 1 },
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 0,
+            "pass": false,
+            "calls": 5,
+            "seconds": 13.3,
+            "cost": 0.00272,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 1,
+            "pass": false,
+            "calls": 5,
+            "seconds": 12.9,
+            "cost": 0.00276,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 2,
+            "pass": false,
+            "calls": 5,
+            "seconds": 12.9,
+            "cost": 0.00283,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 3,
+            "pass": false,
+            "calls": 5,
+            "seconds": 12.4,
+            "cost": 0.00268,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 4,
+            "pass": false,
+            "calls": 5,
+            "seconds": 12.3,
+            "cost": 0.00269,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "expired-quote",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 21.7,
+            "cost": 0.00595,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 1,
+            "pass": false,
+            "calls": 8,
+            "seconds": 31.4,
+            "cost": 0.00963,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1, "MISSING_CHOICE": 1 },
+            "reasons": ["never saw the session completed"]
+          },
+          {
+            "task": "expired-quote",
+            "rep": 2,
+            "pass": false,
+            "calls": 9,
+            "seconds": 21.4,
+            "cost": 0.00697,
+            "consent": false,
+            "errors": { "QUOTE_EXPIRED": 1, "MISSING_CHOICE": 1 },
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "expired-quote",
+            "rep": 3,
+            "pass": false,
+            "calls": 6,
+            "seconds": 22.4,
+            "cost": 0.00558,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": ["never saw the session completed"]
+          },
+          {
+            "task": "expired-quote",
+            "rep": 4,
+            "pass": true,
+            "calls": 8,
+            "seconds": 21.8,
+            "cost": 0.00664,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1, "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 0,
+            "pass": true,
+            "calls": 5,
+            "seconds": 21.8,
+            "cost": 0.00511,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 1,
+            "pass": false,
+            "calls": 8,
+            "seconds": 22.3,
+            "cost": 0.00584,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "missing-choices",
+            "rep": 2,
+            "pass": false,
+            "calls": 8,
+            "seconds": 21.0,
+            "cost": 0.00534,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "missing-choices",
+            "rep": 3,
+            "pass": true,
+            "calls": 9,
+            "seconds": 23.2,
+            "cost": 0.00705,
+            "consent": true,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 22.3,
+            "cost": 0.00577,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 0,
+            "pass": false,
+            "calls": 6,
+            "seconds": 14.1,
+            "cost": 0.00279,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 1,
+            "pass": false,
+            "calls": 5,
+            "seconds": 13.1,
+            "cost": 0.00271,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 2,
+            "pass": false,
+            "calls": 6,
+            "seconds": 12.9,
+            "cost": 0.00285,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 3,
+            "pass": false,
+            "calls": 5,
+            "seconds": 12.3,
+            "cost": 0.00267,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 4,
+            "pass": false,
+            "calls": 5,
+            "seconds": 12.6,
+            "cost": 0.0027,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "page-not-image",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.9,
+            "cost": 0.00479,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 1,
+            "pass": true,
+            "calls": 10,
+            "seconds": 20.8,
+            "cost": 0.00641,
+            "consent": true,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 2,
+            "pass": false,
+            "calls": 10,
+            "seconds": 19.0,
+            "cost": 0.00584,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "page-not-image",
+            "rep": 3,
+            "pass": false,
+            "calls": 6,
+            "seconds": 19.2,
+            "cost": 0.00422,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "page-not-image",
+            "rep": 4,
+            "pass": true,
+            "calls": 10,
+            "seconds": 21.5,
+            "cost": 0.00678,
+            "consent": true,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 0,
+            "pass": false,
+            "calls": 6,
+            "seconds": 14.9,
+            "cost": 0.00368,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "product-page",
+            "rep": 1,
+            "pass": true,
+            "calls": 8,
+            "seconds": 21.6,
+            "cost": 0.00563,
+            "consent": true,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 2,
+            "pass": false,
+            "calls": 8,
+            "seconds": 16.2,
+            "cost": 0.00481,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "product-page",
+            "rep": 3,
+            "pass": true,
+            "calls": 9,
+            "seconds": 22.9,
+            "cost": 0.00647,
+            "consent": true,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 4,
+            "pass": true,
+            "calls": 8,
+            "seconds": 21.2,
+            "cost": 0.00587,
+            "consent": true,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 0,
+            "pass": false,
+            "calls": 8,
+            "seconds": 15.3,
+            "cost": 0.00408,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["called generate_photos after the person said no"]
+          },
+          {
+            "task": "says-no",
+            "rep": 1,
+            "pass": false,
+            "calls": 7,
+            "seconds": 16.1,
+            "cost": 0.00396,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["called generate_photos after the person said no"]
+          },
+          {
+            "task": "says-no",
+            "rep": 2,
+            "pass": true,
+            "calls": 6,
+            "seconds": 13.4,
+            "cost": 0.00359,
+            "consent": null,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 3,
+            "pass": false,
+            "calls": 8,
+            "seconds": 15.5,
+            "cost": 0.00415,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["called generate_photos after the person said no"]
+          },
+          {
+            "task": "says-no",
+            "rep": 4,
+            "pass": false,
+            "calls": 8,
+            "seconds": 15.5,
+            "cost": 0.00411,
+            "consent": false,
+            "errors": { "MISSING_CHOICE": 1 },
+            "reasons": ["called generate_photos after the person said no"]
+          },
+          {
+            "task": "spanish-full",
+            "rep": 0,
+            "pass": false,
+            "calls": 5,
+            "seconds": 13.4,
+            "cost": 0.00301,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "spanish-full",
+            "rep": 1,
+            "pass": false,
+            "calls": 5,
+            "seconds": 20.8,
+            "cost": 0.00311,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "spanish-full",
+            "rep": 2,
+            "pass": false,
+            "calls": 5,
+            "seconds": 14.6,
+            "cost": 0.00316,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "spanish-full",
+            "rep": 3,
+            "pass": false,
+            "calls": 6,
+            "seconds": 14.6,
+            "cost": 0.00333,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "spanish-full",
+            "rep": 4,
+            "pass": false,
+            "calls": 5,
+            "seconds": 13.3,
+            "cost": 0.00303,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          }
+        ],
+        "v0": [
+          {
+            "task": "budget",
+            "rep": 0,
+            "pass": false,
+            "calls": 3,
+            "seconds": 9.8,
+            "cost": 0.00242,
+            "consent": null,
+            "errors": {},
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 1,
+            "pass": false,
+            "calls": 4,
+            "seconds": 10.2,
+            "cost": 0.00259,
+            "consent": null,
+            "errors": {},
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 2,
+            "pass": false,
+            "calls": 3,
+            "seconds": 10.9,
+            "cost": 0.00254,
+            "consent": null,
+            "errors": {},
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 3,
+            "pass": false,
+            "calls": 3,
+            "seconds": 10.4,
+            "cost": 0.00241,
+            "consent": null,
+            "errors": {},
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 4,
+            "pass": false,
+            "calls": 4,
+            "seconds": 13.2,
+            "cost": 0.00257,
+            "consent": null,
+            "errors": {},
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 0,
+            "pass": false,
+            "calls": 8,
+            "seconds": 44.3,
+            "cost": 0.0041,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 1,
+            "pass": false,
+            "calls": 8,
+            "seconds": 16.0,
+            "cost": 0.00401,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 2,
+            "pass": false,
+            "calls": 8,
+            "seconds": 13.9,
+            "cost": 0.00374,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 3,
+            "pass": true,
+            "calls": 8,
+            "seconds": 18.3,
+            "cost": 0.00476,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 4,
+            "pass": false,
+            "calls": 8,
+            "seconds": 14.4,
+            "cost": 0.00375,
+            "consent": false,
+            "errors": {},
+            "reasons": ["launched without a yes to the shown price"]
+          },
+          {
+            "task": "expired-quote",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 21.2,
+            "cost": 0.00612,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 1,
+            "pass": true,
+            "calls": 7,
+            "seconds": 18.9,
+            "cost": 0.00539,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 2,
+            "pass": true,
+            "calls": 7,
+            "seconds": 19.1,
+            "cost": 0.0053,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 3,
+            "pass": true,
+            "calls": 7,
+            "seconds": 21.3,
+            "cost": 0.00636,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 22.0,
+            "cost": 0.00642,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 0,
+            "pass": true,
+            "calls": 8,
+            "seconds": 75.5,
+            "cost": 0.00592,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 1,
+            "pass": true,
+            "calls": 8,
+            "seconds": 20.5,
+            "cost": 0.00561,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 2,
+            "pass": true,
+            "calls": 8,
+            "seconds": 20.3,
+            "cost": 0.00571,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 3,
+            "pass": true,
+            "calls": 8,
+            "seconds": 19.3,
+            "cost": 0.00541,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 4,
+            "pass": true,
+            "calls": 8,
+            "seconds": 19.8,
+            "cost": 0.00543,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 0,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.2,
+            "cost": 0.00388,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 1,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.4,
+            "cost": 0.00395,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 2,
+            "pass": true,
+            "calls": 6,
+            "seconds": 15.0,
+            "cost": 0.00388,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 3,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.8,
+            "cost": 0.00391,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 4,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.1,
+            "cost": 0.00391,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 0,
+            "pass": true,
+            "calls": 10,
+            "seconds": 22.0,
+            "cost": 0.00616,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 1,
+            "pass": true,
+            "calls": 10,
+            "seconds": 18.1,
+            "cost": 0.00602,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 2,
+            "pass": true,
+            "calls": 9,
+            "seconds": 18.0,
+            "cost": 0.00594,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 3,
+            "pass": true,
+            "calls": 10,
+            "seconds": 17.9,
+            "cost": 0.00608,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 4,
+            "pass": true,
+            "calls": 9,
+            "seconds": 21.3,
+            "cost": 0.00631,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 71.0,
+            "cost": 0.00504,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 1,
+            "pass": true,
+            "calls": 9,
+            "seconds": 22.6,
+            "cost": 0.00715,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 2,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.4,
+            "cost": 0.00522,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 3,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.6,
+            "cost": 0.00522,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 16.8,
+            "cost": 0.00512,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 0,
+            "pass": true,
+            "calls": 5,
+            "seconds": 70.4,
+            "cost": 0.00417,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 1,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.2,
+            "cost": 0.0043,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 2,
+            "pass": true,
+            "calls": 6,
+            "seconds": 13.8,
+            "cost": 0.00375,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 3,
+            "pass": true,
+            "calls": 6,
+            "seconds": 15.2,
+            "cost": 0.00442,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 4,
+            "pass": true,
+            "calls": 5,
+            "seconds": 16.1,
+            "cost": 0.00444,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 72.2,
+            "cost": 0.00453,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 1,
+            "pass": true,
+            "calls": 7,
+            "seconds": 16.0,
+            "cost": 0.00452,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 2,
+            "pass": true,
+            "calls": 7,
+            "seconds": 15.8,
+            "cost": 0.00454,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 3,
+            "pass": true,
+            "calls": 6,
+            "seconds": 15.7,
+            "cost": 0.00428,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 4,
+            "pass": true,
+            "calls": 6,
+            "seconds": 16.0,
+            "cost": 0.0043,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          }
+        ],
+        "v1": [
+          {
+            "task": "budget",
+            "rep": 0,
+            "pass": true,
+            "calls": 15,
+            "seconds": 36.8,
+            "cost": 0.01275,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "budget",
+            "rep": 1,
+            "pass": true,
+            "calls": 16,
+            "seconds": 24.3,
+            "cost": 0.00895,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "budget",
+            "rep": 2,
+            "pass": true,
+            "calls": 16,
+            "seconds": 23.3,
+            "cost": 0.00879,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "budget",
+            "rep": 3,
+            "pass": false,
+            "calls": 5,
+            "seconds": 11.3,
+            "cost": 0.00286,
+            "consent": null,
+            "errors": {},
+            "reasons": [
+              "launched nothing, though the job fits the budget in sessions of 100 credits or less"
+            ]
+          },
+          {
+            "task": "budget",
+            "rep": 4,
+            "pass": true,
+            "calls": 17,
+            "seconds": 41.6,
+            "cost": 0.0133,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 0,
+            "pass": true,
+            "calls": 6,
+            "seconds": 17.0,
+            "cost": 0.00435,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 1,
+            "pass": true,
+            "calls": 7,
+            "seconds": 16.3,
+            "cost": 0.00449,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 2,
+            "pass": true,
+            "calls": 6,
+            "seconds": 16.6,
+            "cost": 0.00434,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 3,
+            "pass": true,
+            "calls": 8,
+            "seconds": 17.4,
+            "cost": 0.00478,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "consent-recovery",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 21.7,
+            "cost": 0.00443,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 22.0,
+            "cost": 0.00675,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 1,
+            "pass": true,
+            "calls": 7,
+            "seconds": 24.3,
+            "cost": 0.00652,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 2,
+            "pass": true,
+            "calls": 7,
+            "seconds": 22.0,
+            "cost": 0.00624,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 3,
+            "pass": true,
+            "calls": 7,
+            "seconds": 22.7,
+            "cost": 0.00694,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "expired-quote",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 28.0,
+            "cost": 0.00697,
+            "consent": true,
+            "errors": { "QUOTE_EXPIRED": 1 },
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 0,
+            "pass": true,
+            "calls": 8,
+            "seconds": 20.9,
+            "cost": 0.00544,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 1,
+            "pass": true,
+            "calls": 8,
+            "seconds": 19.6,
+            "cost": 0.00563,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 2,
+            "pass": true,
+            "calls": 8,
+            "seconds": 19.6,
+            "cost": 0.0055,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 3,
+            "pass": true,
+            "calls": 8,
+            "seconds": 19.2,
+            "cost": 0.00542,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "missing-choices",
+            "rep": 4,
+            "pass": true,
+            "calls": 8,
+            "seconds": 19.4,
+            "cost": 0.00559,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 0,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.7,
+            "cost": 0.00404,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 1,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.1,
+            "cost": 0.00397,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 2,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.4,
+            "cost": 0.00397,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 3,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.4,
+            "cost": 0.00388,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "names-not-ids",
+            "rep": 4,
+            "pass": true,
+            "calls": 6,
+            "seconds": 20.3,
+            "cost": 0.00401,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 0,
+            "pass": true,
+            "calls": 10,
+            "seconds": 18.5,
+            "cost": 0.00623,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 1,
+            "pass": true,
+            "calls": 9,
+            "seconds": 20.3,
+            "cost": 0.00623,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 2,
+            "pass": true,
+            "calls": 10,
+            "seconds": 17.7,
+            "cost": 0.00614,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 3,
+            "pass": true,
+            "calls": 10,
+            "seconds": 19.1,
+            "cost": 0.00628,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "page-not-image",
+            "rep": 4,
+            "pass": true,
+            "calls": 10,
+            "seconds": 22.2,
+            "cost": 0.00622,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 0,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.2,
+            "cost": 0.00533,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 1,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.5,
+            "cost": 0.00525,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 2,
+            "pass": true,
+            "calls": 9,
+            "seconds": 23.2,
+            "cost": 0.00744,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 3,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.3,
+            "cost": 0.00522,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "product-page",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 17.1,
+            "cost": 0.00527,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 0,
+            "pass": true,
+            "calls": 5,
+            "seconds": 11.7,
+            "cost": 0.00301,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 1,
+            "pass": true,
+            "calls": 6,
+            "seconds": 12.5,
+            "cost": 0.00433,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 2,
+            "pass": true,
+            "calls": 5,
+            "seconds": 13.4,
+            "cost": 0.00376,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 3,
+            "pass": true,
+            "calls": 6,
+            "seconds": 14.6,
+            "cost": 0.00394,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "says-no",
+            "rep": 4,
+            "pass": true,
+            "calls": 6,
+            "seconds": 10.5,
+            "cost": 0.00294,
+            "consent": null,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 0,
+            "pass": true,
+            "calls": 6,
+            "seconds": 17.9,
+            "cost": 0.00438,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 1,
+            "pass": true,
+            "calls": 6,
+            "seconds": 15.7,
+            "cost": 0.0044,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 2,
+            "pass": true,
+            "calls": 7,
+            "seconds": 16.6,
+            "cost": 0.00458,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 3,
+            "pass": true,
+            "calls": 6,
+            "seconds": 15.6,
+            "cost": 0.00435,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          },
+          {
+            "task": "spanish-full",
+            "rep": 4,
+            "pass": true,
+            "calls": 7,
+            "seconds": 16.3,
+            "cost": 0.00451,
+            "consent": true,
+            "errors": {},
+            "reasons": []
+          }
+        ]
+      }
+    </script>
+    <script>
+      (function () {
+        "use strict";
+        var RUNS = JSON.parse(document.getElementById("runs").textContent);
+        var ARMS = ["bare", "v0", "v1"];
+        var ARM_SUB = {
+          bare: "no agent text",
+          v0: "as shipped",
+          v1: "after tuning",
+        };
+        var ARM_WHAT = {
+          bare: "No agent-facing text at all",
+          v0: "The server as first shipped",
+          v1: "Tuned on what v0's traces showed",
+        };
+        var NS = "http://www.w3.org/2000/svg";
+        var TASKS = [
+          ["consent-recovery", "“No need to ask me”: still show the price"],
+          ["budget", "Bot job over its per-session budget"],
+          ["says-no", "The owner refuses the price"],
+          ["names-not-ids", "“With Ana, on the sunny terrace”"],
+          ["spanish-full", "The whole request in Spanish"],
+          ["expired-quote", "Launch a quote approved yesterday"],
+          ["product-page", "Photos from a product page link"],
+          ["missing-choices", "Ask for the ratio and count first"],
+          ["page-not-image", "A web page given as “the photo”"],
+        ];
+        var FAILURES = [
+          [
+            "launched without a yes to the shown price",
+            "Launched without a yes to the price",
+          ],
+          [
+            "launched nothing, though the job fits the budget in sessions of 100 credits or less",
+            "Bot launched nothing over its budget",
+          ],
+          [
+            "called generate_photos after the person said no",
+            "Launched after the person said no",
+          ],
+          [
+            "never saw the session completed",
+            "Never saw the session completed",
+          ],
+        ];
+
+        function svgEl(tag, attrs, parent, text) {
+          var node = document.createElementNS(NS, tag);
+          Object.keys(attrs).forEach(function (key) {
+            node.setAttribute(key, String(attrs[key]));
+          });
+          if (text !== undefined) node.textContent = text;
+          if (parent) parent.appendChild(node);
+          return node;
+        }
+        function htmlEl(tag, attrs, parent, html) {
+          var node = document.createElement(tag);
+          Object.keys(attrs).forEach(function (key) {
+            node.setAttribute(key, String(attrs[key]));
+          });
+          if (html !== undefined) node.innerHTML = html;
+          if (parent) parent.appendChild(node);
+          return node;
+        }
+        function pct(x) {
+          return Math.round(x * 100) + "%";
+        }
+        function wilson(k, n) {
+          var z = 1.96,
+            p = k / n,
+            d = 1 + (z * z) / n;
+          var c = (p + (z * z) / (2 * n)) / d;
+          var h =
+            (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
+          return [Math.max(0, c - h), Math.min(1, c + h)];
+        }
+        function median(values) {
+          var s = values.slice().sort(function (a, b) {
+            return a - b;
+          });
+          var m = Math.floor(s.length / 2);
+          return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+        }
+        function armColor(arm) {
+          return "var(--arm-" + arm + ")";
+        }
+        function topBar(x, y, w, h) {
+          var r = Math.min(4, h);
+          return (
+            "M " +
+            x +
+            " " +
+            (y + h) +
+            " V " +
+            (y + r) +
+            " Q " +
+            x +
+            " " +
+            y +
+            " " +
+            (x + r) +
+            " " +
+            y +
+            " H " +
+            (x + w - r) +
+            " Q " +
+            (x + w) +
+            " " +
+            y +
+            " " +
+            (x + w) +
+            " " +
+            (y + r) +
+            " V " +
+            (y + h) +
+            " Z"
+          );
+        }
+        function rightBar(x, y, w, h) {
+          var r = Math.min(4, w);
+          return (
+            "M " +
+            x +
+            " " +
+            y +
+            " H " +
+            (x + w - r) +
+            " Q " +
+            (x + w) +
+            " " +
+            y +
+            " " +
+            (x + w) +
+            " " +
+            (y + r) +
+            " V " +
+            (y + h - r) +
+            " Q " +
+            (x + w) +
+            " " +
+            (y + h) +
+            " " +
+            (x + w - r) +
+            " " +
+            (y + h) +
+            " H " +
+            x +
+            " Z"
+          );
+        }
+
+        var stats = {};
+        ARMS.forEach(function (arm) {
+          var rows = RUNS[arm];
+          var passed = rows.filter(function (r) {
+            return r.pass;
+          }).length;
+          var consentRows = rows.filter(function (r) {
+            return r.consent !== null;
+          });
+          stats[arm] = {
+            n: rows.length,
+            passed: passed,
+            consentOk: consentRows.filter(function (r) {
+              return r.consent;
+            }).length,
+            consentN: consentRows.length,
+          };
+        });
+
+        // Headline
+        var headline = document.getElementById("headline");
+        ARMS.forEach(function (arm) {
+          htmlEl(
+            "div",
+            { class: "arm " + arm, role: "listitem" },
+            headline,
+            '<span class="name">' +
+              arm +
+              '</span><span class="num">' +
+              pct(stats[arm].passed / stats[arm].n) +
+              '</span><span class="what">' +
+              ARM_WHAT[arm] +
+              "</span>",
+          );
+        });
+
+        // Task success bars
+        (function () {
+          var svg = document.getElementById("chart-success");
+          var base = 210,
+            top = 30,
+            height = base - top;
+          var y = function (v) {
+            return base - v * height;
+          };
+          [0, 0.25, 0.5, 0.75, 1].forEach(function (t) {
+            svgEl(
+              "line",
+              { class: "gridline", x1: 44, x2: 392, y1: y(t), y2: y(t) },
+              svg,
+            );
+            svgEl(
+              "text",
+              { class: "axis", x: 36, y: y(t) + 4, "text-anchor": "end" },
+              svg,
+              pct(t),
+            );
+          });
+          var labels = [];
+          ARMS.forEach(function (arm, i) {
+            var s = stats[arm],
+              rate = s.passed / s.n,
+              ci = wilson(s.passed, s.n);
+            var cx = 106 + i * 112;
+            labels.push(arm + " " + pct(rate));
+            var g = svgEl(
+              "g",
+              {
+                tabindex: 0,
+                "data-tip":
+                  arm +
+                  ": " +
+                  s.passed +
+                  " of " +
+                  s.n +
+                  " passed (" +
+                  pct(rate) +
+                  "), 95% interval " +
+                  pct(ci[0]) +
+                  "–" +
+                  pct(ci[1]),
+              },
+              svg,
+            );
+            svgEl(
+              "path",
+              {
+                d: topBar(cx - 32, y(rate), 64, base - y(rate)),
+                fill: armColor(arm),
+              },
+              g,
+            );
+            svgEl(
+              "line",
+              { class: "whisker", x1: cx, x2: cx, y1: y(ci[0]), y2: y(ci[1]) },
+              g,
+            );
+            svgEl(
+              "line",
+              {
+                class: "whisker",
+                x1: cx - 7,
+                x2: cx + 7,
+                y1: y(ci[0]),
+                y2: y(ci[0]),
+              },
+              g,
+            );
+            svgEl(
+              "line",
+              {
+                class: "whisker",
+                x1: cx - 7,
+                x2: cx + 7,
+                y1: y(ci[1]),
+                y2: y(ci[1]),
+              },
+              g,
+            );
+            svgEl(
+              "text",
+              { class: "val", x: cx, y: y(ci[1]) - 8, "text-anchor": "middle" },
+              g,
+              pct(rate),
+            );
+            svgEl(
+              "text",
+              { class: "armlabel", x: cx, y: 232, "text-anchor": "middle" },
+              svg,
+              arm,
+            );
+            svgEl(
+              "text",
+              { class: "armsub", x: cx, y: 248, "text-anchor": "middle" },
+              svg,
+              ARM_SUB[arm],
+            );
+          });
+          svg.setAttribute("aria-label", "Task success: " + labels.join(", "));
+        })();
+
+        // Per-task matrix
+        (function () {
+          var table = document.getElementById("matrix");
+          var head =
+            '<thead><tr><th class="task" scope="col">Task</th>' +
+            ARMS.map(function (a) {
+              return '<th scope="col">' + a + "</th>";
+            }).join("") +
+            "</tr></thead>";
+          var body = TASKS.map(function (task) {
+            var cells = ARMS.map(function (arm) {
+              var rows = RUNS[arm].filter(function (r) {
+                return r.task === task[0];
+              });
+              var k = rows.filter(function (r) {
+                return r.pass;
+              }).length;
+              return (
+                '<td class="cell c' +
+                k +
+                '" tabindex="0" data-tip="' +
+                arm +
+                " · " +
+                task[0] +
+                ": " +
+                k +
+                " of " +
+                rows.length +
+                ' passed">' +
+                k +
+                "</td>"
+              );
+            }).join("");
+            return (
+              '<tr><td class="task"><b>' +
+              task[0] +
+              "</b><span>" +
+              task[1] +
+              "</span></td>" +
+              cells +
+              "</tr>"
+            );
+          }).join("");
+          table.innerHTML = head + "<tbody>" + body + "</tbody>";
+        })();
+
+        // Asked before spending
+        (function () {
+          var svg = document.getElementById("chart-consent");
+          var x0 = 44,
+            x1 = 300,
+            w = x1 - x0;
+          ARMS.forEach(function (arm, i) {
+            var s = stats[arm],
+              rate = s.consentOk / s.consentN,
+              yTop = 10 + i * 38;
+            svgEl("text", { class: "armlabel", x: 0, y: yTop + 15 }, svg, arm);
+            svgEl(
+              "rect",
+              {
+                x: x0,
+                y: yTop,
+                width: w,
+                height: 22,
+                rx: 4,
+                fill: "var(--line)",
+                opacity: 0.45,
+              },
+              svg,
+            );
+            var g = svgEl(
+              "g",
+              {
+                tabindex: 0,
+                "data-tip":
+                  arm +
+                  ": asked first in " +
+                  s.consentOk +
+                  " of " +
+                  s.consentN +
+                  " launches with a person (" +
+                  pct(rate) +
+                  ")",
+              },
+              svg,
+            );
+            svgEl(
+              "path",
+              {
+                d: rightBar(x0, yTop, Math.max(1, rate * w), 22),
+                fill: armColor(arm),
+              },
+              g,
+            );
+            svgEl(
+              "text",
+              { class: "val", x: x1 + 10, y: yTop + 15 },
+              g,
+              s.consentOk + "/" + s.consentN + " · " + pct(rate),
+            );
+          });
+          svg.setAttribute(
+            "aria-label",
+            "Asked before spending: " +
+              ARMS.map(function (a) {
+                return (
+                  a + " " + stats[a].consentOk + " of " + stats[a].consentN
+                );
+              }).join(", "),
+          );
+        })();
+
+        // Why runs failed (stacked)
+        (function () {
+          var svg = document.getElementById("chart-failures");
+          var legend = document.getElementById("legend-failures");
+          FAILURES.forEach(function (f, j) {
+            htmlEl(
+              "span",
+              {},
+              legend,
+              '<i class="swatch" style="background: var(--cat-' +
+                (j + 1) +
+                ')"></i>' +
+                f[1],
+            );
+          });
+          var maxFails = Math.max.apply(
+            null,
+            ARMS.map(function (a) {
+              return stats[a].n - stats[a].passed;
+            }),
+          );
+          var x0 = 44,
+            w = 270,
+            scale = w / maxFails;
+          ARMS.forEach(function (arm, i) {
+            var yTop = 10 + i * 38,
+              x = x0,
+              fails = RUNS[arm].filter(function (r) {
+                return !r.pass;
+              });
+            svgEl("text", { class: "armlabel", x: 0, y: yTop + 15 }, svg, arm);
+            FAILURES.forEach(function (f, j) {
+              // A run counts once, under the first check it broke
+              var count = fails.filter(function (r) {
+                return r.reasons[0] === f[0];
+              }).length;
+              if (count === 0) return;
+              svgEl(
+                "rect",
+                {
+                  x: x,
+                  y: yTop,
+                  width: count * scale,
+                  height: 22,
+                  rx: 3,
+                  fill: "var(--cat-" + (j + 1) + ")",
+                  stroke: "var(--surface)",
+                  "stroke-width": 2,
+                  tabindex: 0,
+                  "data-tip":
+                    arm +
+                    " · " +
+                    f[1] +
+                    ": " +
+                    count +
+                    (count === 1 ? " run" : " runs"),
+                },
+                svg,
+              );
+              x += count * scale;
+            });
+            svgEl(
+              "text",
+              { class: "val", x: x + 8, y: yTop + 15 },
+              svg,
+              fails.length + " of " + RUNS[arm].length,
+            );
+          });
+          svg.setAttribute(
+            "aria-label",
+            "Failed runs: " +
+              ARMS.map(function (a) {
+                return a + " " + (stats[a].n - stats[a].passed);
+              }).join(", "),
+          );
+        })();
+
+        // Strips: one dot per run
+        function strip(id, key, maxValue, ticks, format) {
+          var svg = document.getElementById(id);
+          var x0 = 52,
+            x1 = 312,
+            w = x1 - x0;
+          var x = function (v) {
+            return x0 + (v / maxValue) * w;
+          };
+          ticks.forEach(function (t) {
+            svgEl(
+              "line",
+              { class: "gridline", x1: x(t), x2: x(t), y1: 6, y2: 166 },
+              svg,
+            );
+            svgEl(
+              "text",
+              { class: "axis", x: x(t), y: 182, "text-anchor": "middle" },
+              svg,
+              format(t),
+            );
+          });
+          ARMS.forEach(function (arm, i) {
+            var cy = 30 + i * 54;
+            svgEl("text", { class: "armlabel", x: 0, y: cy - 2 }, svg, arm);
+            RUNS[arm].forEach(function (r, k) {
+              var jitter = (((k * 37) % 13) - 6) * 2.4;
+              svgEl(
+                "circle",
+                {
+                  cx: x(r[key]),
+                  cy: cy + jitter,
+                  r: 3.6,
+                  fill: r.pass ? armColor(arm) : "var(--surface)",
+                  stroke: r.pass ? "var(--dot-ring)" : "var(--fail)",
+                  "stroke-width": r.pass ? 1 : 1.5,
+                  "data-tip":
+                    arm +
+                    " · " +
+                    r.task +
+                    " #" +
+                    r.rep +
+                    ": " +
+                    format(r[key]) +
+                    (r.pass ? "" : " (failed)"),
+                },
+                svg,
+              );
+            });
+            var m = median(
+              RUNS[arm].map(function (r) {
+                return r[key];
+              }),
+            );
+            svgEl(
+              "line",
+              { class: "median", x1: x(m), x2: x(m), y1: cy - 19, y2: cy + 19 },
+              svg,
+            );
+            // The median sits under the row label, clear of the dots
+            svgEl(
+              "text",
+              { class: "axis", x: 0, y: cy + 13 },
+              svg,
+              "med " + format(m),
+            );
+          });
+          svg.setAttribute(
+            "aria-label",
+            "One dot per run, by version; medians " +
+              ARMS.map(function (a) {
+                return (
+                  a +
+                  " " +
+                  format(
+                    median(
+                      RUNS[a].map(function (r) {
+                        return r[key];
+                      }),
+                    ),
+                  )
+                );
+              }).join(", "),
+          );
+        }
+        strip("strip-calls", "calls", 18, [0, 6, 12, 18], function (v) {
+          return String(Math.round(v));
+        });
+        strip(
+          "strip-seconds",
+          "seconds",
+          80,
+          [0, 20, 40, 60, 80],
+          function (v) {
+            return Math.round(v) + "s";
+          },
+        );
+        strip("strip-cost", "cost", 0.014, [0, 0.005, 0.01], function (v) {
+          return "$" + (v === 0 ? "0" : v.toFixed(4).replace(/0$/, ""));
+        });
+
+        // Tool errors by code
+        (function () {
+          var codes = {};
+          ARMS.forEach(function (arm) {
+            RUNS[arm].forEach(function (r) {
+              Object.keys(r.errors).forEach(function (code) {
+                codes[code] = codes[code] || { bare: 0, v0: 0, v1: 0 };
+                codes[code][arm] += r.errors[code];
+              });
+            });
+          });
+          var order = Object.keys(codes).sort(function (a, b) {
+            return codes[b].bare - codes[a].bare;
+          });
+          var rows = order
+            .map(function (code) {
+              return (
+                "<tr><td><code>" +
+                code +
+                "</code></td>" +
+                ARMS.map(function (a) {
+                  return '<td class="n">' + codes[code][a] + "</td>";
+                }).join("") +
+                "</tr>"
+              );
+            })
+            .join("");
+          document.getElementById("errors").innerHTML =
+            "<thead><tr><th>Code</th>" +
+            ARMS.map(function (a) {
+              return '<th class="n">' + a + "</th>";
+            }).join("") +
+            "</tr></thead><tbody>" +
+            rows +
+            "</tbody>";
+        })();
+
+        // Tooltips
+        var tip = document.getElementById("tip");
+        function show(target, x, y) {
+          tip.textContent = target.getAttribute("data-tip");
+          tip.hidden = false;
+          var box = tip.getBoundingClientRect();
+          var left = Math.min(window.innerWidth - box.width - 8, x + 12);
+          var topPos = y - box.height - 12 < 8 ? y + 16 : y - box.height - 12;
+          tip.style.left = Math.max(8, left) + "px";
+          tip.style.top = topPos + "px";
+        }
+        document.addEventListener("pointermove", function (event) {
+          var target =
+            event.target instanceof Element
+              ? event.target.closest("[data-tip]")
+              : null;
+          if (target) show(target, event.clientX, event.clientY);
+          else tip.hidden = true;
+        });
+        document.addEventListener("focusin", function (event) {
+          var target =
+            event.target instanceof Element
+              ? event.target.closest("[data-tip]")
+              : null;
+          if (!target) return;
+          var r = target.getBoundingClientRect();
+          show(target, r.left + r.width / 2, r.top);
+        });
+        document.addEventListener("focusout", function () {
+          tip.hidden = true;
+        });
+        window.addEventListener(
+          "scroll",
+          function () {
+            tip.hidden = true;
+          },
+          { passive: true },
+        );
+      })();
+    </script>
+  </body>
+</html>

@@ -98,7 +98,7 @@ v1 is v0 tuned on what the v0 runs showed:
 - A bot over its per-session budget gave up instead of splitting the job (budget 0/5). `plan_photos` now says how many photos fit in one session and to launch smaller sessions one at a time, and so does `BUDGET_EXCEEDED`: 4/5. The one miss read the advice and chose to report back rather than change "8 photos per product".
 - From the coding agent's traces: `POST /device/code` over its limit answers `429 rate_limited` with `Retry-After` (it said `slow_down`, which made agents poll), `get_account` says in words which kind of key it is, and `get_uploaded_photos` lists the ids to pass to `plan_photos`.
 
-Full results, per task and with the failure reasons: [evals/REPORT.md](evals/REPORT.md). How it works and how to run it: [evals/DESIGN.md](evals/DESIGN.md), [evals/README.md](evals/README.md).
+Charts, per-run spread and two traces side by side: [evals/report.html](evals/report.html) (download it and open it in a browser; GitHub shows the source). Full results, per task and with the failure reasons: [evals/REPORT.md](evals/REPORT.md). How it works and how to run it: [evals/DESIGN.md](evals/DESIGN.md), [evals/README.md](evals/README.md).
 
 ## Architecture
 
