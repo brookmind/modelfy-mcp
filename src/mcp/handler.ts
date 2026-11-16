@@ -8,19 +8,21 @@ import { layerText } from "./layer";
 import { buildServer } from "./server";
 import type { Session } from "./session";
 
-const GrantAuth = z.object({ token: z.string(), userId: z.string() });
+const GrantAuth = z.object({ token: z.string() });
 
 /**
- * Ends the grant of this request only (its access token is
- * `userId:grantId:secret`), so the client signs in again. Other grants of the
- * same user and client (another device) are left alone.
+ * Ends the grant of this request only, so the client signs in again. Other
+ * grants of the same user and client (another device) are left alone. An API
+ * key has no grant: the provider knows no such token and nothing is revoked.
  */
 async function revokeConnection(env: AppEnv, auth: unknown): Promise<void> {
   const parsed = GrantAuth.safeParse(auth);
   if (!parsed.success) return;
-  const [tokenUser, grantId] = parsed.data.token.split(":");
-  if (tokenUser !== parsed.data.userId || grantId === undefined) return;
-  await env.OAUTH_PROVIDER.revokeGrant(grantId, parsed.data.userId);
+  const token = await env.OAUTH_PROVIDER.unwrapToken<unknown>(
+    parsed.data.token,
+  );
+  if (token === null) return;
+  await env.OAUTH_PROVIDER.revokeGrant(token.grantId, token.userId);
 }
 
 /** POST /mcp, after the provider has checked the token and set ctx.props. */
