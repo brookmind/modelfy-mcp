@@ -29,7 +29,7 @@ An OAuth connection called `generate_photos` without `user_confirmed: true`. Not
 
 ### INSUFFICIENT_CREDITS
 
-The account does not have enough credits. Tell the person; they can buy credits or change plan at https://beta.modelfy.ai/plans. Or plan fewer photos.
+The account does not have enough credits. Tell the person; they can buy credits or change plan at https://app.modelfy.ai/plans. Or plan fewer photos.
 
 ### BUDGET_EXCEEDED
 

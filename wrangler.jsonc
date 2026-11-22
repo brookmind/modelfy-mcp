@@ -75,7 +75,7 @@
       ],
       "vars": {
         "API_URL": "https://api.modelfy.ai",
-        "WEB_URL": "https://beta.modelfy.ai",
+        "WEB_URL": "https://app.modelfy.ai",
         "PUBLIC_URL": "https://mcp.modelfy.ai",
       },
     },

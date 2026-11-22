@@ -6,7 +6,7 @@ export { DOC_PAGES } from "./content";
 
 /** The URLs the Markdown sources are written with (production). */
 const SOURCE_MCP_URL = "https://mcp.modelfy.ai";
-const SOURCE_WEB_URL = "https://beta.modelfy.ai";
+const SOURCE_WEB_URL = "https://app.modelfy.ai";
 
 /** Where this deployment lives, so dev serves dev links. */
 export interface DocUrls {

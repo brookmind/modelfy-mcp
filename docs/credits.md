@@ -43,4 +43,4 @@ A job bigger than the budget per session is still allowed within the daily budge
 
 ## Not enough credits
 
-`plan_photos` returns `enough_credits: false` before anything is tried, and a launch without enough credits fails with `INSUFFICIENT_CREDITS`. The person can buy credits or change plan at https://beta.modelfy.ai/plans.
+`plan_photos` returns `enough_credits: false` before anything is tried, and a launch without enough credits fails with `INSUFFICIENT_CREDITS`. The person can buy credits or change plan at https://app.modelfy.ai/plans.
