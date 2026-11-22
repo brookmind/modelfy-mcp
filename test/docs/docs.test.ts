@@ -62,7 +62,7 @@ describe("the docs on the web", () => {
     expect(body).toContain("https://mcp.test/mcp");
     expect(body).toContain("https://web.test/plans");
     expect(body).not.toContain("mcp.modelfy.ai");
-    expect(body).not.toContain("beta.modelfy.ai");
+    expect(body).not.toContain("app.modelfy.ai");
   });
 
   it("every error code's docs_url anchor exists", async () => {

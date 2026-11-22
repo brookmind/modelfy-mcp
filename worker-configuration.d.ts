@@ -6,7 +6,7 @@ interface __BaseEnv_Env {
 	ANON_CALLS: RateLimit;
 	KEY_REQUESTS: RateLimit;
 	API_URL: "https://api-dev.modelfy.ai" | "https://api.modelfy.ai" | "http://localhost:3000";
-	WEB_URL: "https://beta-dev.modelfy.ai" | "https://beta.modelfy.ai" | "http://localhost:5173";
+	WEB_URL: "https://beta-dev.modelfy.ai" | "https://app.modelfy.ai" | "http://localhost:5173";
 	PUBLIC_URL: "https://mcp-dev.modelfy.ai" | "https://mcp.modelfy.ai" | "http://localhost:8787";
 	MCP_SERVER_SECRET: string;
 	SANDBOX_ACCOUNT_KEY: string;
@@ -30,7 +30,7 @@ declare namespace Cloudflare {
 		ANON_CALLS: RateLimit;
 		KEY_REQUESTS: RateLimit;
 		API_URL: "https://api.modelfy.ai";
-		WEB_URL: "https://beta.modelfy.ai";
+		WEB_URL: "https://app.modelfy.ai";
 		PUBLIC_URL: "https://mcp.modelfy.ai";
 		MCP_SERVER_SECRET: string;
 		SANDBOX_ACCOUNT_KEY: string;

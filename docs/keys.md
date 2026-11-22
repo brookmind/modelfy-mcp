@@ -76,8 +76,8 @@ curl -X POST https://mcp.modelfy.ai/device/code \
 {
   "device_code": "…",
   "user_code": "BCDF-GHJK",
-  "verification_uri": "https://beta.modelfy.ai/activate",
-  "verification_uri_complete": "https://beta.modelfy.ai/activate?code=BCDF-GHJK",
+  "verification_uri": "https://app.modelfy.ai/activate",
+  "verification_uri_complete": "https://app.modelfy.ai/activate?code=BCDF-GHJK",
   "expires_in": 600,
   "interval": 5
 }
