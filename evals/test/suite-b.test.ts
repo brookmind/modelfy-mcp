@@ -160,7 +160,7 @@ describe("node-script check", () => {
 describe("device-login check", () => {
   it("fails when the key appears in the agent's own messages", () => {
     const trace = new Script()
-      .agent("Open https://beta-dev.modelfy.ai/activate?code=BCDF-GHJK")
+      .agent("Open https://app-dev.modelfy.ai/activate?code=BCDF-GHJK")
       .agent(`Done! Your key is ${KEY}`)
       .trace();
 
@@ -175,7 +175,7 @@ describe("device-login check", () => {
 
   it("passes when the key was approved, saved, works and stayed hidden", () => {
     const trace = new Script()
-      .agent("Open https://beta-dev.modelfy.ai/activate?code=BCDF-GHJK")
+      .agent("Open https://app-dev.modelfy.ai/activate?code=BCDF-GHJK")
       .agent("Done: the key is saved in .env as MODELFY_API_KEY.")
       .trace();
 
