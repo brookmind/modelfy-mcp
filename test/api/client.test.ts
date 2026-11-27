@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiFailure, ModelfyApi } from "../../src/api/client";
+import { runToolCall } from "../../src/mcp/tool-call";
 
 const Thing = z.object({ id: z.string(), credits: z.number() });
 
@@ -29,6 +30,36 @@ describe("ModelfyApi", () => {
     expect(seen[0]?.url).toBe("https://api.test/v2/thing");
     expect(seen[0]?.headers.get("Authorization")).toBe("Bearer mfy_live_x");
     expect(seen[0]?.headers.get("X-Mcp-Secret")).toBe("test-secret");
+  });
+
+  it("names the tool call on every request made inside it", async () => {
+    const seen: Request[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      seen.push(new Request(input, init));
+      return Promise.resolve(json(200, { data: { id: "t1", credits: 5 } }));
+    });
+    const api = new ModelfyApi(env, "mfy_live_x");
+
+    await runToolCall("plan_photos", async () => {
+      await Promise.all([
+        api.get("/v2/a", Thing),
+        api.post("/v2/b", { x: 1 }, Thing),
+      ]);
+    });
+    await runToolCall("get_account", () => api.get("/v2/c", Thing));
+    await api.get("/v2/d", Thing);
+
+    const [a, b, c, d] = seen;
+    expect(a?.headers.get("X-Mcp-Tool")).toBe("plan_photos");
+    expect(b?.headers.get("X-Mcp-Tool")).toBe("plan_photos");
+    expect(a?.headers.get("X-Mcp-Call")).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    expect(b?.headers.get("X-Mcp-Call")).toBe(a?.headers.get("X-Mcp-Call"));
+    expect(c?.headers.get("X-Mcp-Tool")).toBe("get_account");
+    expect(c?.headers.get("X-Mcp-Call")).not.toBe(a?.headers.get("X-Mcp-Call"));
+    expect(d?.headers.get("X-Mcp-Tool")).toBeNull();
+    expect(d?.headers.get("X-Mcp-Call")).toBeNull();
   });
 
   it("sends no Authorization header without a token", async () => {

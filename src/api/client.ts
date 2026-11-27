@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
 import { z } from "zod";
+import { currentToolCall } from "../mcp/tool-call";
 
 /** A failed call to the Modelfy API, with the API's error code. */
 export class ApiFailure extends Error {
@@ -60,6 +61,11 @@ export class ModelfyApi {
       headers.set("Authorization", `Bearer ${this.#token}`);
     }
     if (body !== undefined) headers.set("Content-Type", "application/json");
+    const toolCall = currentToolCall();
+    if (toolCall !== undefined) {
+      headers.set("X-Mcp-Tool", toolCall.tool);
+      headers.set("X-Mcp-Call", toolCall.id);
+    }
 
     let response: Response;
     try {

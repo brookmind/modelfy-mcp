@@ -110,7 +110,7 @@ export function registerAccountTools(
       annotations: READ_ONLY,
     },
     () =>
-      guarded(session, async () => {
+      guarded(session, "get_account", async () => {
         const account = await session.backend.account();
         return respond(
           `${account.credits} credits available${account.sandbox ? " (sandbox)" : ""}.${layer.guidance(` ${KEY_KINDS[account.keyKind]}`)}`,
@@ -132,7 +132,7 @@ export function registerAccountTools(
       annotations: READ_ONLY,
     },
     () =>
-      guarded(session, async () => {
+      guarded(session, "list_models", async () => {
         const models = await session.backend.models();
         return respond(`${models.length} models.`, { models });
       }),
@@ -151,7 +151,7 @@ export function registerAccountTools(
       annotations: READ_ONLY,
     },
     () =>
-      guarded(session, async () => {
+      guarded(session, "list_backgrounds", async () => {
         const backgrounds = await session.backend.backgrounds();
         return respond(`${backgrounds.length} backgrounds.`, { backgrounds });
       }),
@@ -170,7 +170,7 @@ export function registerAccountTools(
       annotations: READ_ONLY,
     },
     () =>
-      guarded(session, async () => {
+      guarded(session, "get_photo_options", async () => {
         const options = await session.backend.options();
         return respond(`Formats: ${options.aspectRatios.join(", ")}.`, {
           ...options,

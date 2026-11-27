@@ -4,6 +4,7 @@ import type { PhotoBackend } from "../backend/types";
 import type { AppEnv } from "../env";
 import { errorResult, toAgentError } from "./errors";
 import type { LayerText } from "./layer";
+import { runToolCall } from "./tool-call";
 
 /** One authenticated MCP request: who it is, its backend, and how to end it. */
 export interface Session {
@@ -32,13 +33,17 @@ export function respond(
   };
 }
 
-/** Runs a tool body; any failure becomes an agent error result. */
+/**
+ * Runs a tool body as one tool call (its API requests name the tool); any
+ * failure becomes an agent error result.
+ */
 export async function guarded(
   session: Session,
+  tool: string,
   body: () => Promise<CallToolResult>,
 ): Promise<CallToolResult> {
   try {
-    return await body();
+    return await runToolCall(tool, body);
   } catch (error) {
     const agentError = toAgentError(error);
     if (agentError.code === "CONNECTION_REVOKED") await session.revoke();
