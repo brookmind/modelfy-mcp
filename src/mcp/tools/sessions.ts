@@ -233,7 +233,7 @@ export function registerSessionTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (input) =>
-      guarded(session, async () => {
+      guarded(session, "plan_photos", async () => {
         const [plan, account] = await Promise.all([
           session.backend.plan(input),
           session.backend.account(),
@@ -311,7 +311,7 @@ export function registerSessionTools(
       },
     },
     ({ quote_id, user_confirmed }) =>
-      guarded(session, async () => {
+      guarded(session, "generate_photos", async () => {
         const kv = session.env.OAUTH_KV;
         const quote = await readQuote(kv, session.owner, quote_id);
         if (quote === "expired") {
@@ -364,7 +364,7 @@ export function registerSessionTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ session_id, wait_seconds }) =>
-      guarded(session, async () => {
+      guarded(session, "get_photo_session", async () => {
         const deadline = Date.now() + wait_seconds * 1000;
         let status = await session.backend.session(session_id);
         while (
@@ -396,7 +396,7 @@ export function registerSessionTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ limit, session_id }) =>
-      guarded(session, async () => {
+      guarded(session, "list_recent_photos", async () => {
         const photos = await session.backend.recent(limit, session_id ?? null);
         return respond(`${photos.length} photos.`, { photos });
       }),
@@ -419,7 +419,7 @@ export function registerSessionTools(
       },
     },
     ({ session_id }) =>
-      guarded(session, async () => {
+      guarded(session, "cancel_photo_session", async () => {
         const status = await session.backend.cancel(session_id);
         return respond(statusSentence(status, layer), { ...status });
       }),

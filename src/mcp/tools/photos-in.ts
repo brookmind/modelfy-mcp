@@ -88,7 +88,7 @@ export function registerPhotoInputTools(
       annotations: { readOnlyHint: false, openWorldHint: true },
     },
     ({ image_urls }) =>
-      guarded(session, async () => {
+      guarded(session, "add_product_photos", async () => {
         const photos = await session.backend.addPhotosFromUrls(image_urls);
         const ok = photos.filter((photo) => "upload_id" in photo).length;
         return respond(`${ok} of ${photos.length} photos added.`, { photos });
@@ -108,7 +108,7 @@ export function registerPhotoInputTools(
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
     ({ files }) =>
-      guarded(session, async () => {
+      guarded(session, "create_upload_session", async () => {
         const created = await session.backend.createUploadSession(files);
         return respond(`Upload session ready. Page: ${created.page_url}`, {
           ...created,
@@ -129,7 +129,7 @@ export function registerPhotoInputTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ session_id }) =>
-      guarded(session, async () => {
+      guarded(session, "get_uploaded_photos", async () => {
         const state = await session.backend.readUploadSession(session_id);
         // The ids in the sentence itself: a coding agent in the evals looked
         // for a `ready` field and reported the upload as rejected
