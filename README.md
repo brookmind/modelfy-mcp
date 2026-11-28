@@ -148,6 +148,8 @@ npm run deploy:dev
 
 After that, every push to `main` that passes CI deploys to dev on its own (`.github/workflows/ci.yml`). It needs two GitHub secrets: `CLOUDFLARE_API_TOKEN` (a token with the "Edit Cloudflare Workers" template) and `CLOUDFLARE_ACCOUNT_ID`.
 
+Production (`mcp.modelfy.ai`) is deployed by hand: run the CI workflow on `main` from the Actions tab (or `gh workflow run ci.yml --ref main`). It runs the checks, then `wrangler deploy --env production` with the same secrets.
+
 ## License
 
 [MIT](LICENSE)

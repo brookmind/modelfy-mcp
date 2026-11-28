@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Production deploys are started by hand: Actions > CI > Run workflow (main)
+  workflow_dispatch:
 
 jobs:
   check:
@@ -40,3 +42,22 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env dev
+
+  # Started by hand on main (workflow_dispatch): mcp.modelfy.ai.
+  deploy-production:
+    needs: check
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: deploy-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env production
